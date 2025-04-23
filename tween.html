@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprite com Animação Tween - Easing Avançado</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            background-color: #000;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .easing-selection {
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            max-width: 800px;
+        }
+        select {
+            padding: 5px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+        .easing-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+        .easing-box {
+            width: 140px;
+            background-color: #333;
+            padding: 8px;
+            border-radius: 5px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.3s;
+        }
+        .easing-box:hover {
+            background-color: #555;
+        }
+        .easing-box.selected {
+            background-color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div class="controls">
+        <button id="startBtn">Iniciar Loop</button>
+        <button id="stopBtn">Parar Loop</button>
+        <button id="shootBtn">Disparar Uma Vez</button>
+    </div>
+    
+    <div class="easing-selection">
+        <div>
+            <label for="easingSelect">Função de Easing:</label>
+            <select id="easingSelect">
+                <option value="linear">Linear</option>
+                <optgroup label="Sine">
+                    <option value="easeInSine">easeInSine</option>
+                    <option value="easeOutSine">easeOutSine</option>
+                    <option value="easeInOutSine">easeInOutSine</option>
+                </optgroup>
+                <optgroup label="Quad">
+                    <option value="easeInQuad">easeInQuad</option>
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                </optgroup>
+                <optgroup label="Cubic">
+                    <option value="easeInCubic">easeInCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                </optgroup>
+                <optgroup label="Quart">
+                    <option value="easeInQuart">easeInQuart</option>
+                    <option value="easeOutQuart">easeOutQuart</option>
+                    <option value="easeInOutQuart">easeInOutQuart</option>
+                </optgroup>
+                <optgroup label="Quint">
+                    <option value="easeInQuint">easeInQuint</option>
+                    <option value="easeOutQuint">easeOutQuint</option>
+                    <option value="easeInOutQuint">easeInOutQuint</option>
+                </optgroup>
+                <optgroup label="Expo">
+                    <option value="easeInExpo">easeInExpo</option>
+                    <option value="easeOutExpo">easeOutExpo</option>
+                    <option value="easeInOutExpo">easeInOutExpo</option>
+                </optgroup>
+                <optgroup label="Circ">
+                    <option value="easeInCirc">easeInCirc</option>
+                    <option value="easeOutCirc">easeOutCirc</option>
+                    <option value="easeInOutCirc">easeInOutCirc</option>
+                </optgroup>
+                <optgroup label="Back">
+                    <option value="easeInBack">easeInBack</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                    <option value="easeInOutBack">easeInOutBack</option>
+                </optgroup>
+                <optgroup label="Elastic">
+                    <option value="easeInElastic">easeInElastic</option>
+                    <option value="easeOutElastic">easeOutElastic</option>
+                    <option value="easeInOutElastic">easeInOutElastic</option>
+                </optgroup>
+                <optgroup label="Bounce">
+                    <option value="easeInBounce">easeInBounce</option>
+                    <option value="easeOutBounce">easeOutBounce</option>
+                    <option value="easeInOutBounce">easeInOutBounce</option>
+                </optgroup>
+            </select>
+        </div>
+        
+        <div class="easing-preview" id="easingPreview">
+            <!-- Preenchido dinamicamente pelo JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // Configuração inicial
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Classe para implementar Tween com easing avançado
+        class Tween {
+            constructor(objeto, propriedades, duracao, easing = 'linear', onComplete = null) {
+                this.objeto = objeto;
+                this.valorInicial = {};
+                this.valorAlvo = propriedades;
+                this.duracao = duracao;
+                this.tempoDecorrido = 0;
+                this.ativo = false;
+                this.loop = false;
+                this.easing = easing;
+                this.onComplete = onComplete;
+                
+                // Armazenar os valores iniciais
+                for (const prop in propriedades) {
+                    if (objeto.hasOwnProperty(prop)) {
+                        this.valorInicial[prop] = objeto[prop];
+                    }
+                }
+            }
+            
+            iniciar() {
+                this.tempoDecorrido = 0;
+                this.ativo = true;
+                return this;
+            }
+            
+            pararLoop() {
+                this.loop = false;
+                return this;
+            }
+            
+            ativarLoop() {
+                this.loop = true;
+                return this;
+            }
+            
+            atualizar(deltaTime) {
+                if (!this.ativo) return false;
+                
+                this.tempoDecorrido += deltaTime;
+                
+                if (this.tempoDecorrido >= this.duracao) {
+                    // Garantir que os valores finais sejam exatamente os alvos
+                    for (const prop in this.valorAlvo) {
+                        this.objeto[prop] = this.valorAlvo[prop];
+                    }
+                    
+                    if (this.loop) {
+                        // Reiniciar para um novo ciclo
+                        this.resetarParaInicio();
+                        return true;
+                    } else {
+                        this.ativo = false;
+                        if (this.onComplete) this.onComplete();
+                        return false;
+                    }
+                }
+                
+                // Calcular progresso e aplicar easing
+                const progresso = this.tempoDecorrido / this.duracao;
+                const valorEasing = this.aplicarEasing(progresso);
+                
+                // Atualizar os valores conforme a função de easing
+                for (const prop in this.valorAlvo) {
+                    if (this.objeto.hasOwnProperty(prop)) {
+                        const valorInicial = this.valorInicial[prop];
+                        const valorFinal = this.valorAlvo[prop];
+                        this.objeto[prop] = valorInicial + (valorFinal - valorInicial) * valorEasing;
+                    }
+                }
+                
+                return true;
+            }
+            
+            resetarParaInicio() {
+                this.tempoDecorrido = 0;
+                // Trocar valores iniciais e finais para criar um efeito de ida e volta
+                for (const prop in this.valorAlvo) {
+                    if (this.objeto.hasOwnProperty(prop)) {
+                        const temp = this.valorInicial[prop];
+                        this.valorInicial[prop] = this.valorAlvo[prop];
+                        this.valorAlvo[prop] = temp;
+                    }
+                }
+            }
+            
+            aplicarEasing(t) {
+                // Uma implementação extensa de funções de easing
+                const PI = Math.PI;
+                const c1 = 1.70158;
+                const c2 = c1 * 1.525;
+                const c3 = c1 + 1;
+                const c4 = (2 * PI) / 3;
+                const c5 = (2 * PI) / 4.5;
+                
+                switch (this.easing) {
+                    case 'linear':
+                        return t;
+                        
+                    // Sine
+                    case 'easeInSine':
+                        return 1 - Math.cos((t * PI) / 2);
+                    case 'easeOutSine':
+                        return Math.sin((t * PI) / 2);
+                    case 'easeInOutSine':
+                        return -(Math.cos(PI * t) - 1) / 2;
+                        
+                    // Quad
+                    case 'easeInQuad':
+                        return t * t;
+                    case 'easeOutQuad':
+                        return 1 - (1 - t) * (1 - t);
+                    case 'easeInOutQuad':
+                        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+                        
+                    // Cubic
+                    case 'easeInCubic':
+                        return t * t * t;
+                    case 'easeOutCubic':
+                        return 1 - Math.pow(1 - t, 3);
+                    case 'easeInOutCubic':
+                        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                        
+                    // Quart
+                    case 'easeInQuart':
+                        return t * t * t * t;
+                    case 'easeOutQuart':
+                        return 1 - Math.pow(1 - t, 4);
+                    case 'easeInOutQuart':
+                        return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+                        
+                    // Quint
+                    case 'easeInQuint':
+                        return t * t * t * t * t;
+                    case 'easeOutQuint':
+                        return 1 - Math.pow(1 - t, 5);
+                    case 'easeInOutQuint':
+                        return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+                        
+                    // Expo
+                    case 'easeInExpo':
+                        return t === 0 ? 0 : Math.pow(2, 10 * t - 10);
+                    case 'easeOutExpo':
+                        return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+                    case 'easeInOutExpo':
+                        return t === 0
+                            ? 0
+                            : t === 1
+                            ? 1
+                            : t < 0.5 
+                            ? Math.pow(2, 20 * t - 10) / 2
+                            : (2 - Math.pow(2, -20 * t + 10)) / 2;
+                            
+                    // Circ
+                    case 'easeInCirc':
+                        return 1 - Math.sqrt(1 - Math.pow(t, 2));
+                    case 'easeOutCirc':
+                        return Math.sqrt(1 - Math.pow(t - 1, 2));
+                    case 'easeInOutCirc':
+                        return t < 0.5
+                            ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2
+                            : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2;
+                            
+                    // Back
+                    case 'easeInBack':
+                        return c3 * t * t * t - c1 * t * t;
+                    case 'easeOutBack':
+                        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+                    case 'easeInOutBack':
+                        return t < 0.5
+                            ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+                            : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+                            
+                    // Elastic
+                    case 'easeInElastic':
+                        return t === 0
+                            ? 0
+                            : t === 1
+                            ? 1
+                            : -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
+                    case 'easeOutElastic':
+                        return t === 0
+                            ? 0
+                            : t === 1
+                            ? 1
+                            : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+                    case 'easeInOutElastic':
+                        return t === 0
+                            ? 0
+                            : t === 1
+                            ? 1
+                            : t < 0.5
+                            ? -(Math.pow(2, 20 * t - 10) * Math.sin((20 * t - 11.125) * c5)) / 2
+                            : (Math.pow(2, -20 * t + 10) * Math.sin((20 * t - 11.125) * c5)) / 2 + 1;
+                            
+                    // Bounce
+                    case 'easeInBounce':
+                        return 1 - this.bounceOut(1 - t);
+                    case 'easeOutBounce':
+                        return this.bounceOut(t);
+                    case 'easeInOutBounce':
+                        return t < 0.5
+                            ? (1 - this.bounceOut(1 - 2 * t)) / 2
+                            : (1 + this.bounceOut(2 * t - 1)) / 2;
+                            
+                    default:
+                        return t;
+                }
+            }
+            
+            bounceOut(x) {
+                const n1 = 7.5625;
+                const d1 = 2.75;
+                
+                if (x < 1 / d1) {
+                    return n1 * x * x;
+                } else if (x < 2 / d1) {
+                    return n1 * (x -= 1.5 / d1) * x + 0.75;
+                } else if (x < 2.5 / d1) {
+                    return n1 * (x -= 2.25 / d1) * x + 0.9375;
+                } else {
+                    return n1 * (x -= 2.625 / d1) * x + 0.984375;
+                }
+            }
+        }
+
+        // Classe Sprite
+        class Sprite {
+            constructor(x, y, largura, altura, cor) {
+                this.x = x;
+                this.y = y;
+                this.largura = largura;
+                this.altura = altura;
+                this.cor = cor;
+                this.rotacao = 0;
+                this.escala = 1;
+                this.opacidade = 1;
+                this.velocidadeX = 0;
+                this.velocidadeY = 0;
+            }
+            
+            desenhar(ctx) {
+                ctx.save();
+                
+                // Aplicar transformações
+                ctx.translate(this.x + this.largura/2, this.y + this.altura/2);
+                ctx.rotate(this.rotacao);
+                ctx.scale(this.escala, this.escala);
+                ctx.globalAlpha = this.opacidade;
+                
+                // Desenhar o sprite
+                ctx.fillStyle = this.cor;
+                ctx.fillRect(-this.largura/2, -this.altura/2, this.largura, this.altura);
+                
+                // Adicionar detalhes ao sprite para melhor efeito visual
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-this.largura/2, -this.altura/2, this.largura, this.altura);
+                
+                // Desenhar um "olho" no sprite para visualizar rotação
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.largura/4, -this.altura/4, this.largura/10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+            
+            atualizar() {
+                this.x += this.velocidadeX;
+                this.y += this.velocidadeY;
+                
+                // Reflexão nas bordas do canvas
+                if (this.x <= 0 || this.x + this.largura >= canvas.width) {
+                    this.velocidadeX *= -1;
+                }
+                
+                if (this.y <= 0 || this.y + this.altura >= canvas.height) {
+                    this.velocidadeY *= -1;
+                }
+            }
+        }
+
+        // Criação do sprite
+        const sprite = new Sprite(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100, '#ff4500');
+
+        // Gerenciador de tweens
+        const tweens = [];
+        let ultimoTimestamp = 0;
+        let animacaoAtiva = false;
+        let easingAtual = 'easeInOutQuad';
+
+        // Seletor de easing
+        const easingSelect = document.getElementById('easingSelect');
+        easingSelect.addEventListener('change', function() {
+            easingAtual = this.value;
+        });
+
+        // Criar visualização de easing
+        const easingPreview = document.getElementById('easingPreview');
+        
+        // Lista de funções de easing para visualização
+        const easingTypes = [
+            'linear', 
+            'easeInSine', 'easeOutSine', 'easeInOutSine',
+            'easeInQuad', 'easeOutQuad', 'easeInOutQuad',
+            'easeInCubic', 'easeOutCubic', 'easeInOutCubic',
+            'easeInQuart', 'easeOutQuart', 'easeInOutQuart',
+            'easeInExpo', 'easeOutExpo', 'easeInOutExpo',
+            'easeInBack', 'easeOutBack', 'easeInOutBack',
+            'easeInElastic', 'easeOutElastic', 'easeInOutElastic',
+            'easeInBounce', 'easeOutBounce', 'easeInOutBounce'
+        ];
+        
+        // Criar elementos de visualização para cada tipo de easing
+        easingTypes.forEach(type => {
+            const box = document.createElement('div');
+            box.className = 'easing-box';
+            box.textContent = type;
+            box.addEventListener('click', () => {
+                // Remover classe 'selected' de todos os boxes
+                document.querySelectorAll('.easing-box').forEach(b => b.classList.remove('selected'));
+                
+                // Adicionar classe 'selected' ao box clicado
+                box.classList.add('selected');
+                
+                // Atualizar o select
+                easingSelect.value = type;
+                
+                // Atualizar easing atual
+                easingAtual = type;
+                
+                // Demonstrar o easing selecionado
+                dispararUmaVez(type);
+            });
+            easingPreview.appendChild(box);
+        });
+
+        // Funções para manipular animações
+        function criarAnimacaoLoop() {
+            tweens.length = 0; // Limpar tweens existentes
+            
+            // Tween para rotação
+            const tweenRotacao = new Tween(sprite, { rotacao: Math.PI * 2 }, 2000, easingAtual);
+            tweenRotacao.ativarLoop().iniciar();
+            tweens.push(tweenRotacao);
+            
+            // Tween para escala
+            const tweenEscala = new Tween(sprite, { escala: 1.5 }, 1500, easingAtual);
+            tweenEscala.ativarLoop().iniciar();
+            tweens.push(tweenEscala);
+            
+            // Tween para posição
+            const tweenPosicao = new Tween(
+                sprite, 
+                { x: canvas.width - 150, y: canvas.height - 150 }, 
+                3000, 
+                easingAtual
+            );
+            tweenPosicao.ativarLoop().iniciar();
+            tweens.push(tweenPosicao);
+            
+            // Tween para cor (não podemos interpolar strings diretamente)
+            sprite.cor = '#ff4500'; // Laranja para começar
+            
+            if (!animacaoAtiva) {
+                animacaoAtiva = true;
+                requestAnimationFrame(loopAnimacao);
+            }
+        }
+
+        function pararAnimacao() {
+            for (const tween of tweens) {
+                tween.pararLoop();
+            }
+        }
+
+        function dispararUmaVez(easingEspecifico = null) {
+            const easing = easingEspecifico || easingAtual;
+            
+            // Criar uma animação única
+            const tweenUnico = new Tween(
+                sprite, 
+                { 
+                    x: Math.random() * (canvas.width - 100), 
+                    y: Math.random() * (canvas.height - 100),
+                    rotacao: Math.PI * 4,
+                    escala: 0.5
+                }, 
+                1000, 
+                easing,
+                () => {
+                    // Depois de completar, volta ao normal
+                    const tweenRetorno = new Tween(
+                        sprite, 
+                        { 
+                            x: canvas.width/2 - 50, 
+                            y: canvas.height/2 - 50,
+                            rotacao: 0,
+                            escala: 1
+                        }, 
+                        800, 
+                        'easeOutElastic'
+                    );
+                    tweenRetorno.iniciar();
+                    tweens.push(tweenRetorno);
+                }
+            );
+            tweenUnico.iniciar();
+            tweens.push(tweenUnico);
+            
+            if (!animacaoAtiva) {
+                animacaoAtiva = true;
+                requestAnimationFrame(loopAnimacao);
+            }
+        }
+
+        // Loop de animação principal
+        function loopAnimacao(timestamp) {
+            // Calcular delta time para animação suave
+            if (!ultimoTimestamp) ultimoTimestamp = timestamp;
+            const deltaTime = timestamp - ultimoTimestamp;
+            ultimoTimestamp = timestamp;
+            
+            // Limpar o canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Atualizar as tweens
+            let tweensAtivas = false;
+            for (let i = tweens.length - 1; i >= 0; i--) {
+                const ativa = tweens[i].atualizar(deltaTime);
+                if (ativa) tweensAtivas = true;
+                else if (!tweens[i].loop) {
+                    // Remover tweens inativas que não estão em loop
+                    tweens.splice(i, 1);
+                }
+            }
+            
+            // Atualizar e desenhar o sprite
+            sprite.atualizar();
+            sprite.desenhar(ctx);
+            
+            // Continuar o loop enquanto houver tweens ativas
+            if (tweensAtivas) {
+                requestAnimationFrame(loopAnimacao);
+            } else {
+                animacaoAtiva = false;
+            }
+        }
+
+        // Configurar os botões
+        document.getElementById('startBtn').addEventListener('click', criarAnimacaoLoop);
+        document.getElementById('stopBtn').addEventListener('click', pararAnimacao);
+        document.getElementById('shootBtn').addEventListener('click', () => dispararUmaVez());
+
+        // Destacar o easing padrão na interface
+        document.querySelectorAll('.easing-box').forEach(box => {
+            if (box.textContent === easingAtual) {
+                box.classList.add('selected');
+            }
+        });
+
+        // Desenhar o sprite inicial
+        sprite.desenhar(ctx);
+    </script>
+</body>
+</html>
