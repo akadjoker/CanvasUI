@@ -9,8 +9,14 @@ export class Graphics {
     save() { this.ctx.save(); }
     restore() { this.ctx.restore(); }
 
+    setLineWidth(width) { this.ctx.lineWidth = width; }
+
     setColor(color) {
         this.ctx.fillStyle = color;
+        this.ctx.strokeStyle = color;
+    }
+
+    setStrokeColor(color) {
         this.ctx.strokeStyle = color;
     }
 

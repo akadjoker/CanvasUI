@@ -910,6 +910,14 @@ export class TabView extends Widget {
         this.tweenOut.play();
     }
 
+    setTabeWidth(width) {
+        this.tabWidth = width;
+    }
+
+    setTabHeaderHeight(height) {
+        this.headerHeight = height;
+    }
+
     update(dt) {
         if (!this.visible) return;
         this.tweenOut.update(dt);
@@ -929,7 +937,7 @@ export class TabView extends Widget {
     render(g) {
         if (!this.visible) return;
     
-        const headerY = this.position === "top" ? this.y : (this.y + this.height);
+        const headerY = this.position === "top" ? this.y : (this.y + this.height- this.headerHeight);
         const visibleWidth = this.width - 40;
         const totalTabWidth = this.tabs.length * this.tabWidth;
         this.maxScroll = Math.max(0, totalTabWidth - visibleWidth);
@@ -2069,21 +2077,26 @@ export class ProgressBar extends Widget {
         g.fillRect(this.x, this.y, this.width, this.height);
     
         // Barra de progresso
-        g.setColor(Theme.progressFill);
         if (this.orientation === "horizontal")
-        {
+            {
             const pos = this.width * percent;
+            
+            g.setColor(Theme.progressFill);
             g.fillRect(this.x, this.y, pos, this.height);
             g.setColor(Theme.progressBorder);
-            g.drawLine(this.x + pos, this.y, this.x + pos, this.y + this.height);
+            
+            g.drawLine(this.y + pos, this.y , this.x +pos, this.y + this.height);
+        //    g.fillRect(this.y + pos, this.y, 1, this.height);
             const txt = this.value.toFixed(2);
             const size = g.measureText(txt);
             const w = size.width;
             const h = size.height;
             g.setColor(Theme.progressText);
             g.drawText(txt, this.x + (this.width*0.5) - (w * 0.5) , this.y + (this.height *0.5) - (h * 0.5));
-        } else {
+        } else
+        {
             const pos = this.y + this.height * (1 - percent);
+            g.setColor(Theme.progressFill);
             g.fillRect(this.x, pos, this.width, this.height * percent);
             g.setColor(Theme.progressBorder);
             g.drawLine(this.x, pos, this.x + this.width, pos);
@@ -2322,6 +2335,7 @@ export class SliderCircular extends Widget
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(Math.round(this.value * 100) + '%', this.x, this.y);
+      ctx.lineWidth = 1;
     }
     
     isPointInside(x, y)

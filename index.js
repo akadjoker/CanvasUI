@@ -117,6 +117,14 @@ class MenuFragment extends Fragment
             layout.add(group);
             
             layout.add(combo);
+
+            const tab = new TabView("bottom");
+            tab.setTabeWidth(60);
+            tab.setSize(180, 190);
+            tab.setPosition(210, 320);
+            tab.addTab("Tab 1").add(new Label("Tab 1")).setColor("#000").setPosition(25, 25);
+            tab.addTab("Tab 2").add(new Label("Tab 2")).setColor("#000").setPosition(25, 55);
+            layout.add(tab);
         }
         {
             const layout = body.add(new Layout()).setWidthPercent(0.45);
@@ -136,6 +144,20 @@ class MenuFragment extends Fragment
             text.setPosition(420, 200);
             text.setSize(280, 200);
             layout.add(text);
+
+
+        const progress = new ProgressBar("horizontal");
+        const slider = new Slider(0, 1, 0.1,0.5, "horizontal");
+        slider.setPosition(480, 440);
+        slider.setSize(120, 20);
+        slider.onChange = (v) => progress.setValue(v);
+
+        progress.setPosition(480, 480);
+        progress.setSize(120, 20);
+        progress.setValue(0.5);
+
+        layout.add(progress);
+        layout.add(slider);
             
             
         }
