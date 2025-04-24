@@ -118,7 +118,7 @@ export class Layout extends Widget
     
 }
 
-export class VerticalLayout extends Layout {
+export class HorizontalLayout extends Layout {
     constructor(x = 0, y = 0, width = 100, height = 100) {
         super(x, y, width, height);
         this.setMargins(10, 10, 10, 10);
@@ -169,7 +169,7 @@ export class VerticalLayout extends Layout {
 }
 
 
-export class HorizontalLayout extends Layout
+export class VerticalLayout extends Layout
 {
     constructor(x = 0, y = 0, width = 100, height = 100)
     {

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sistema de Widgets com Scroll Bars</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; background: #f8f8f8; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="1024" height="768"></canvas>
+    <script >
+
+class ScrollableCanvasSystem {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.widgets = [];
+        this.scrollX = 0;
+        this.scrollY = 0;
+        this.contentWidth = this.canvas.width * 0.5; // Conteúdo maior que a tela
+        this.contentHeight = this.canvas.height * 0.5;
+        this.dragging = null;
+        this.hoveredWidget = null;
+        
+        // Configura eventos
+        this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+        this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+        this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+        this.canvas.addEventListener('wheel', this.handleWheel.bind(this));
+        
+        // Inicia o loop de renderização
+        this.lastTime = performance.now();
+        requestAnimationFrame(this.render.bind(this));
+    }
+    
+    addWidget(widget) {
+        this.widgets.push(widget);
+        widget.system = this;
+        // Atualiza o tamanho do conteúdo se necessário
+        this.contentWidth = Math.max(this.contentWidth, widget.x + widget.width);
+        this.contentHeight = Math.max(this.contentHeight, widget.y + widget.height);
+    }
+    
+    // Converte coordenadas da tela para coordenadas do conteúdo
+    screenToContent(x, y) {
+        return {
+            x: x + this.scrollX,
+            y: y + this.scrollY
+        };
+    }
+    
+    // Verifica se o mouse está sobre uma barra de scroll
+    isOverScrollBar(x, y) {
+        const canvas = this.canvas;
+        
+        // Barra horizontal
+        if (this.contentWidth > canvas.width) {
+            const hBarHeight = 10;
+            if (y >= canvas.height - hBarHeight && y <= canvas.height) {
+                return 'horizontal';
+            }
+        }
+        
+        // Barra vertical
+        if (this.contentHeight > canvas.height) {
+            const vBarWidth = 10;
+            if (x >= canvas.width - vBarWidth && x <= canvas.width) {
+                return 'vertical';
+            }
+        }
+        
+        return null;
+    }
+    
+    handleMouseDown(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Verifica se clicou em uma barra de scroll
+        const scrollBar = this.isOverScrollBar(x, y);
+        if (scrollBar) {
+            this.dragging = {
+                type: scrollBar,
+                startX: x,
+                startY: y,
+                startScrollX: this.scrollX,
+                startScrollY: this.scrollY
+            };
+            return;
+        }
+        
+        // Verifica se clicou em um widget
+        const contentPos = this.screenToContent(x, y);
+        for (let i = this.widgets.length - 1; i >= 0; i--) {
+            const widget = this.widgets[i];
+            if (widget.contains(contentPos.x, contentPos.y)) {
+                widget.onMouseDown(contentPos.x - widget.x, contentPos.y - widget.y);
+                this.hoveredWidget = widget;
+                return;
+            }
+        }
+        
+        // Se não clicou em nada, inicia arrasto para scroll
+        this.dragging = {
+            type: 'canvas',
+            startX: x,
+            startY: y,
+            startScrollX: this.scrollX,
+            startScrollY: this.scrollY
+        };
+    }
+    
+    handleMouseMove(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Atualiza hover
+        const contentPos = this.screenToContent(x, y);
+        let newHovered = null;
+        for (let i = this.widgets.length - 1; i >= 0; i--) {
+            const widget = this.widgets[i];
+            if (widget.contains(contentPos.x, contentPos.y)) {
+                newHovered = widget;
+                break;
+            }
+        }
+        
+        if (this.hoveredWidget !== newHovered) {
+            if (this.hoveredWidget) this.hoveredWidget.onMouseLeave();
+            this.hoveredWidget = newHovered;
+            if (this.hoveredWidget) this.hoveredWidget.onMouseEnter();
+        }
+        
+        // Trata arrasto
+        if (this.dragging) {
+            const dx = x - this.dragging.startX;
+            const dy = y - this.dragging.startY;
+            
+            if (this.dragging.type === 'horizontal') {
+                const ratio = this.contentWidth / this.canvas.width;
+                this.scrollX = this.dragging.startScrollX + dx * ratio;
+            } 
+            else if (this.dragging.type === 'vertical') {
+                const ratio = this.contentHeight / this.canvas.height;
+                this.scrollY = this.dragging.startScrollY + dy * ratio;
+            }
+            else if (this.dragging.type === 'canvas') {
+                this.scrollX = this.dragging.startScrollX - dx;
+                this.scrollY = this.dragging.startScrollY - dy;
+            }
+            
+            this.clampScroll();
+        }
+        
+        // Atualiza estado do mouse sobre widgets
+        if (this.hoveredWidget) {
+            this.hoveredWidget.onMouseMove(
+                contentPos.x - this.hoveredWidget.x,
+                contentPos.y - this.hoveredWidget.y
+            );
+        }
+    }
+    
+    handleMouseUp(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Trata clique no widget
+        if (this.hoveredWidget && !this.dragging) {
+            const contentPos = this.screenToContent(x, y);
+            this.hoveredWidget.onClick(
+                contentPos.x - this.hoveredWidget.x,
+                contentPos.y - this.hoveredWidget.y
+            );
+        }
+        
+        this.dragging = null;
+    }
+    
+    handleWheel(e) {
+        // Scroll com roda do mouse
+        this.scrollX += e.deltaX;
+        this.scrollY += e.deltaY;
+        this.clampScroll();
+        e.preventDefault();
+    }
+    
+    clampScroll() {
+        const canvas = this.canvas;
+        this.scrollX = Math.max(0, Math.min(this.scrollX, this.contentWidth - canvas.width));
+        this.scrollY = Math.max(0, Math.min(this.scrollY, this.contentHeight - canvas.height));
+    }
+    
+    render() {
+        const canvas = this.canvas;
+        const ctx = this.ctx;
+        
+        // Limpa o canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Salva o estado do contexto
+        ctx.save();
+        
+        // Aplica transformação de scroll
+        ctx.translate(-this.scrollX, -this.scrollY);
+        
+        // Desenha um fundo para visualização
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, this.contentWidth, this.contentHeight);
+        
+        // Desenha uma grade para referência
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+        const gridSize = 50;
+        for (let x = 0; x < this.contentWidth; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, this.contentHeight);
+            ctx.stroke();
+        }
+        for (let y = 0; y < this.contentHeight; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(this.contentWidth, y);
+            ctx.stroke();
+        }
+        
+        // Desenha todos os widgets
+        for (const widget of this.widgets) {
+            widget.render(ctx);
+        }
+        
+        // Restaura o contexto
+        ctx.restore();
+        
+        // Desenha as barras de scroll
+        this.drawScrollBars();
+        
+        // Continua o loop de renderização
+        requestAnimationFrame(this.render.bind(this));
+    }
+    
+    drawScrollBars() {
+        const canvas = this.canvas;
+        const ctx = this.ctx;
+        
+        // Barra horizontal
+        if (this.contentWidth > canvas.width) {
+            const hBarHeight = 10;
+            const hThumbWidth = (canvas.width / this.contentWidth) * canvas.width;
+            const hThumbPos = (this.scrollX / this.contentWidth) * canvas.width;
+            
+            // Trilha da barra
+            ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
+            ctx.fillRect(0, canvas.height - hBarHeight, canvas.width, hBarHeight);
+            
+            // Thumb da barra
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.7)';
+            ctx.fillRect(hThumbPos, canvas.height - hBarHeight, hThumbWidth, hBarHeight);
+            
+            // Borda da thumb
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(hThumbPos, canvas.height - hBarHeight, hThumbWidth, hBarHeight);
+        }
+        
+        // Barra vertical
+        if (this.contentHeight > canvas.height) {
+            const vBarWidth = 10;
+            const vThumbHeight = (canvas.height / this.contentHeight) * canvas.height;
+            const vThumbPos = (this.scrollY / this.contentHeight) * canvas.height;
+            
+            // Trilha da barra
+            ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
+            ctx.fillRect(canvas.width - vBarWidth, 0, vBarWidth, canvas.height);
+            
+            // Thumb da barra
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.7)';
+            ctx.fillRect(canvas.width - vBarWidth, vThumbPos, vBarWidth, vThumbHeight);
+            
+            // Borda da thumb
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(canvas.width - vBarWidth, vThumbPos, vBarWidth, vThumbHeight);
+        }
+    }
+}
+
+// Classe base para widgets
+class Widget {
+    constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.system = null;
+        this.isHovered = false;
+        this.isPressed = false;
+    }
+    
+    contains(px, py) {
+        return px >= this.x && px <= this.x + this.width &&
+               py >= this.y && py <= this.y + this.height;
+    }
+    
+    onMouseDown(localX, localY) {
+        this.isPressed = true;
+    }
+    
+    onMouseMove(localX, localY) {
+        // Pode ser sobrescrito
+    }
+    
+    onMouseEnter() {
+        this.isHovered = true;
+    }
+    
+    onMouseLeave() {
+        this.isHovered = false;
+        this.isPressed = false;
+    }
+    
+    onClick(localX, localY) {
+        // Pode ser sobrescrito
+    }
+    
+    render(ctx) {
+        // Método abstrato
+    }
+}
+
+// Widget Button
+class Button extends Widget {
+    constructor(x, y, width, height, text) {
+        super(x, y, width, height);
+        this.text = text;
+        this.onClickCallback = null;
+    }
+    
+    onClick(localX, localY) {
+        if (this.onClickCallback) {
+            this.onClickCallback();
+        }
+    }
+    
+    setOnClick(callback) {
+        this.onClickCallback = callback;
+    }
+    
+    render(ctx) {
+        // Fundo do botão
+        if (this.isPressed) {
+            ctx.fillStyle = '#aaa';
+        } else if (this.isHovered) {
+            ctx.fillStyle = '#ddd';
+        } else {
+            ctx.fillStyle = '#ccc';
+        }
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        
+        // Borda do botão
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        
+        // Texto do botão
+        ctx.fillStyle = '#000';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(
+            this.text,
+            this.x + this.width / 2,
+            this.y + this.height / 2
+        );
+    }
+}
+
+
+class Knob extends Widget {
+    constructor(x, y, size, min = 0, max = 100, initialValue = 50) {
+        super(x, y, size, size);
+        this.size = size;
+        this.min = min;
+        this.max = max;
+        this.value = initialValue;
+        this.angle = 0;
+        this.startAngle = -135 * (Math.PI / 180);
+        this.endAngle = 135 * (Math.PI / 180);
+        this.dragStartY = 0;
+        this.dragStartValue = 0;
+        this.onValueChange = null;
+        
+        this.calculateAngle();
+    }
+    
+    calculateAngle() {
+        const range = this.max - this.min;
+        const normalized = (this.value - this.min) / range;
+        this.angle = this.startAngle + (normalized * (this.endAngle - this.startAngle));
+    }
+    
+    calculateValueFromAngle(angle) {
+        // Normaliza o ângulo para o intervalo válido
+        angle = Math.max(this.startAngle, Math.min(this.endAngle, angle));
+        
+        const range = this.endAngle - this.startAngle;
+        const normalized = (angle - this.startAngle) / range;
+        return this.min + (normalized * (this.max - this.min));
+    }
+    
+    onMouseDown(localX, localY) {
+        this.isPressed = true;
+        this.dragStartY = localY;
+        this.dragStartValue = this.value;
+    }
+    
+    onMouseMove(localX, localY) {
+        if (!this.isPressed) return;
+        
+        // Calcula a diferença em Y desde o início do arrasto
+        const dy = this.dragStartY - localY;
+        
+        // Ajusta a sensibilidade do arrasto
+        const sensitivity = (this.max - this.min) / 100;
+        let newValue = this.dragStartValue + (dy * sensitivity);
+        
+        // Limita o valor ao intervalo permitido
+        newValue = Math.max(this.min, Math.min(this.max, newValue));
+        
+        if (newValue !== this.value) {
+            this.value = newValue;
+            this.calculateAngle();
+            
+            if (this.onValueChange) {
+                this.onValueChange(this.value);
+            }
+        }
+    }
+    
+    render(ctx) {
+        const centerX = this.x + this.size / 2;
+        const centerY = this.y + this.size / 2;
+        const radius = this.size / 2;
+        const markerRadius = radius * 0.8;
+        
+        // Fundo do knob
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.isPressed ? '#ddd' : '#eee';
+        ctx.fill();
+        ctx.strokeStyle = '#999';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Marcador de valor
+        const markerX = centerX + Math.cos(this.angle) * markerRadius;
+        const markerY = centerY + Math.sin(this.angle) * markerRadius;
+        
+        ctx.beginPath();
+        ctx.arc(markerX, markerY, radius * 0.1, 0, Math.PI * 2);
+        ctx.fillStyle = '#333';
+        ctx.fill();
+        
+        // Texto do valor atual
+        ctx.fillStyle = '#000';
+        ctx.font = `${Math.floor(this.size * 0.2)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(Math.floor(this.value).toString(), centerX, centerY);
+        
+        // Destaque quando hover
+        if (this.isHovered) {
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius * 1.05, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+}
+
+ 
+// Exemplo de uso
+document.addEventListener('DOMContentLoaded', () => {
+    const system = new ScrollableCanvasSystem('canvas');
+    
+    // Adiciona vários botões
+    for (let i = 0; i < 10; i++) {
+        const btn = new Button(50 + i * 120, 50 + i * 80, 100, 40, `Botão ${i + 1}`);
+        btn.setOnClick(() => console.log(`Botão ${i + 1} clicado!`));
+    //    system.addWidget(btn);
+    }
+    
+    // Adiciona widgets em posições aleatórias
+    for (let i = 0; i < 15; i++) {
+        const x = 50 + Math.random() * 1500;
+        const y = 50 + Math.random() * 1500;
+        const btn = new Button(x, y, 80 + Math.random() * 70, 30 + Math.random() * 40, `Item ${i + 1}`);
+        btn.setOnClick(() => console.log(`Item ${i + 1} clicado em (${x}, ${y})`));
+       // system.addWidget(btn);
+    }
+    const knob1 = new Knob(100, 100, 60, 0, 100, 25);
+        knob1.onValueChange = (value) => {
+            console.log('Knob 1:', value);
+        };
+        system.addWidget(knob1);
+        
+        const knob2 = new Knob(200, 100, 80, -50, 50, 0);
+        knob2.onValueChange = (value) => {
+            console.log('Knob 2:', value);
+        };
+        system.addWidget(knob2);
+});
+
+    </script>
+</body>
+</html>

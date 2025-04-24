@@ -677,15 +677,14 @@ export class Label extends Widget
         super();
         this.text = text;
         this.align = align; // "left", "center", "right"
-        this.color = "#000";
+        this.color = "#fff";
         this.autoSize = false;
     }
 
     render(g) {
         if (!this.visible) return;
 
-        g.setColor(this.color);
-
+        
         const padding = this.padding || { left: 0, top: 0, right: 0, bottom: 0 };
         const x = this.x + padding.left;
         const y = this.y + padding.top;
@@ -702,7 +701,8 @@ export class Label extends Widget
         }
 
         const drawY = y + (h - textSize.height) / 2;
-
+        
+        g.setColor(this.color);
         g.drawText(this.text, drawX, drawY);
     }
 
@@ -830,6 +830,11 @@ export class Panel extends Widget {
         this.borderLight = "#ffffff";
         this.borderDark = "#888888";
         this.textColor = "#000000";
+    }
+
+    setColor(color) {
+        this.color = color;
+        return this;
     }
 
     render(g) {
@@ -1760,7 +1765,7 @@ export class RadioButton extends Widget
 
 export class RadioGroup extends Widget
 {
-    constructor(onChange = null, columns = 1, spacing = 10)
+    constructor(onChange = null, columns = 1, spacing = 50)
     {
         super();
         this.buttons = [];
@@ -1775,10 +1780,19 @@ export class RadioGroup extends Widget
         this.outline = true;
     }
 
+    setCollumWidth(w) {
+        this.colWidth = w;
+    }
+
+    setRowHeight(h) {
+        this.rowHeight = h;
+    }
+
     add(text)
     {
         const b = new RadioButton(text);
         this.buttons.push(b);
+        this._calculateSize();
         return b;
     }
 
@@ -1844,6 +1858,30 @@ export class RadioGroup extends Widget
          
         g.save();
         g.ctx.translate(this.x, this.y);
+      
+
+        for (let i = 0; i < this.buttons.length; i++)
+        {
+            const cb = this.buttons[i];
+            const col = i % this.columns;
+            const row = Math.floor(i / this.columns);
+ 
+           
+
+            cb.setPosition(col * this.colWidth, row * this.rowHeight);
+            cb.render(g);
+        }
+  
+
+        g.restore();
+        if (this.outline)
+        {
+            g.setColor(Theme.radioGroupBorder);
+            g.drawRect(this.x - 2, this.y - 2, this.width, this.height);
+        }
+    }
+
+    _calculateSize() {
         this.maxWidth = 0;
         this.maxHeight = 0;
 
@@ -1859,16 +1897,10 @@ export class RadioGroup extends Widget
             this.maxWidth = Math.max(this.maxWidth,   width );
             this.maxHeight = Math.max(this.maxHeight,  height );
 
-            cb.setPosition(col * this.colWidth, row * this.rowHeight);
-            cb.render(g);
         }
         this.width = this.maxWidth;
         this.height = this.maxHeight;
-
-        g.restore();
-        if (this.outline)
-            g.setColor(Theme.radioGroupBorder);
-            g.drawRect(this.x-2, this.y-2, this.width, this.height);
+   
     }
 
     
@@ -2186,6 +2218,349 @@ export class Knob extends Widget {
     }
     
 }
+
+
+export class SliderCircular extends Widget
+{
+    constructor( onChange)
+    {
+        
+        super();
+        //x - radius, y - radius, radius * 2, radius * 2
+
+      this.radius = 50;
+      this.value = 0.5; // 0 to 1
+      this.isDragging = false;
+      this.startAngle = -0.75 * Math.PI;
+      this.endAngle = 0.75 * Math.PI;
+      this.onChange = onChange || function() {};
+    }
+
+    handleMouseOut()
+    {
+       
+    }
+
+    handleMouse(type, x, y, button)
+    {
+        if (!this.enabled || !this.visible) return false;
+        
+        if (type === 0 && this.contains(x, y))
+        { // DOWN
+            if (this.handleMouseDown(x, y)) {
+                return true;
+            }
+        }
+
+        if (type === 1) { // UP
+            if (this.handleMouseUp(x, y)) {
+                return true;
+            }
+        }
+
+       
+
+        if (type === 2 )
+        { // MOVE
+
+            if (this.handleMouseMove(x, y)) {
+                return true;
+            }
+            
+        }
+
+        
+        return false;
+    }
+    
+    render(g)
+    {
+        const ctx = g.ctx;
+        
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+        this.radius = Math.min(this.width, this.height) / 2;
+        
+      // Fundo do knob
+      ctx.fillStyle = '#ecf0f1';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Borda
+      ctx.strokeStyle = '#bdc3c7';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Trilho
+      ctx.strokeStyle = '#95a5a6';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius - 15, this.startAngle, this.endAngle);
+      ctx.stroke();
+      
+      // Valor atual
+      const valueAngle = this.startAngle + (this.endAngle - this.startAngle) * this.value;
+      ctx.strokeStyle = '#3498db';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius - 15, this.startAngle, valueAngle);
+      ctx.stroke();
+      
+      // Marcador
+      ctx.fillStyle = '#2c3e50';
+      ctx.beginPath();
+      const markerX = this.x + Math.cos(valueAngle) * (this.radius - 15);
+      const markerY = this.y + Math.sin(valueAngle) * (this.radius - 15);
+      ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Valor como texto
+      ctx.fillStyle = '#2c3e50';
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(Math.round(this.value * 100) + '%', this.x, this.y);
+    }
+    
+    isPointInside(x, y)
+    {
+      const dx = x - this.x;
+      const dy = y - this.y;
+      return Math.sqrt(dx * dx + dy * dy) <= this.radius;
+    }
+    
+    _calculateValue(x, y)
+    {
+      const dx = x - this.x;
+      const dy = y - this.y;
+      let angle = Math.atan2(dy, dx);
+    
+ 
+        if (angle < this.startAngle)
+        {
+        // angle += Math.PI * 2;
+        }
+      
+        //max 2.3608456194434537
+      angle = Math.max(this.startAngle, Math.min(this.endAngle, angle));
+      
+ 
+      return (angle - this.startAngle) / (this.endAngle - this.startAngle);
+    }
+    
+    handleMouseMove(x, y)
+    {
+        if (this.isDragging)
+        {
+            const oldValue = this.value;
+            this.value = this._calculateValue(x, y);
+        
+            if (oldValue !== this.value)
+            {
+              this.onChange(this.value);
+        }
+        return true;
+      }
+      return this.isPointInside(x, y);
+    }
+    
+    handleMouseDown(x, y)
+    {
+        if (this.isPointInside(x, y))
+        {
+        this.isDragging = true;
+        return true;
+      }
+      return false;
+    }
+    
+    handleMouseUp(x, y)
+    {
+      this.isDragging = false;
+      return this.isPointInside(x, y);
+    }
+}
+  
+export class TextView extends Widget
+{
+    constructor(content)
+    {
+      super();
+      this.content = content;
+      this.scrollPosition = 0;
+      this.maxScroll = 0;
+      this.isDraggingScroll = false;
+      this.scrollBarWidth = 15;
+      this.lineHeight = 20;
+    }
+    
+    render(g)
+    {
+      const ctx = g.ctx;
+      // Fundo
+      ctx.fillStyle = '#ecf0f1';
+      ctx.fillRect(this.x, this.y, this.width, this.height);
+      
+      // Área de conteúdo
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(this.x, this.y, this.width, this.height);
+      ctx.clip();
+      
+      // Renderizar texto
+      this._renderContent(ctx);
+      
+      ctx.restore();
+      
+      // Barra de rolagem
+      this._drawScrollBar(ctx);
+    }
+    
+    _renderContent(ctx)
+    {
+      ctx.fillStyle = '#34495e';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      
+      const maxWidth = this.width - this.scrollBarWidth - 10;
+      const words = this.content.split(' ');
+      
+      let line = '';
+      let y = this.y + 10 - this.scrollPosition;
+      
+        for (let i = 0; i < words.length; i++)
+        {
+        const testLine = line + words[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        
+            if (metrics.width > maxWidth && i > 0)
+            {
+          ctx.fillText(line, this.x + 10, y);
+          line = words[i] + ' ';
+          y += this.lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      
+      ctx.fillText(line, this.x + 10, y);
+      
+      // Calcular altura total do conteúdo
+      const contentHeight = y + this.lineHeight - this.y + this.scrollPosition;
+      this.maxScroll = Math.max(0, contentHeight - this.height + 20);
+    }
+    
+    _drawScrollBar(ctx)
+    {
+        if (this.maxScroll > 0)
+        {
+        const contentHeight = this.scrollPosition + this.height + this.maxScroll;
+        const scrollHeight = Math.max(30, this.height * (this.height / contentHeight));
+        const scrollPosition = (this.scrollPosition / this.maxScroll) * (this.height - scrollHeight);
+        
+        // Trilho da barra de rolagem
+        ctx.fillStyle = '#bdc3c7';
+        ctx.fillRect(this.x + this.width - this.scrollBarWidth, this.y, this.scrollBarWidth, this.height);
+        
+        // Barra de rolagem
+        ctx.fillStyle = this.isDraggingScroll ? '#7f8c8d' : '#95a5a6';
+        ctx.fillRect(
+          this.x + this.width - this.scrollBarWidth + 2, 
+          this.y + scrollPosition, 
+          this.scrollBarWidth - 4, 
+          scrollHeight
+        );
+      }
+    }
+    
+    _isPointInScrollBar(x, y)
+    {
+      return x >= this.x + this.width - this.scrollBarWidth && 
+             x <= this.x + this.width && 
+             y >= this.y && 
+             y <= this.y + this.height;
+    }
+
+    handleMouseOut()
+    {
+       
+    }
+
+    handleMouse(type, x, y, button)
+    {
+        if (!this.enabled || !this.visible) return false;
+        
+        if (type === 0 && this.contains(x, y))
+        { // DOWN
+            if (this.handleMouseDown(x, y)) {
+                return true;
+            }
+        }
+
+        if (type === 1) { // UP
+            if (this.handleMouseUp(x, y)) {
+                return true;
+            }
+        }
+
+       
+
+        if (type === 2 )
+        { // MOVE
+
+            if (this.handleMouseMove(x, y)) {
+                return true;
+            }
+            
+        }
+
+        
+        return false;
+    }
+    
+    handleMouseMove(x, y)
+    {
+        if (this.isDraggingScroll)
+        {
+        const scrollableHeight = this.height - (this.height * (this.height / (this.maxScroll + this.height)));
+        const scrollRatio = (y - this.y) / this.height;
+        this.scrollPosition = Math.max(0, Math.min(this.maxScroll, this.maxScroll * scrollRatio));
+        return true;
+      }
+      return this.contains(x, y);
+    }
+    
+    handleMouseDown(x, y)
+    {
+        if (this._isPointInScrollBar(x, y))
+        {
+        this.isDraggingScroll = true;
+        return true;
+      }
+      return this.contains(x, y);
+    }
+    
+    handleMouseUp(x, y)
+    {
+      this.isDraggingScroll = false;
+      return this.contains(x, y);
+    }
+    
+    handleWheel(deltaY)
+    {
+        if (this.contains(this.lastMouseX, this.lastMouseY))
+        {
+        this.scrollPosition += deltaY * 0.5;
+        this.scrollPosition = Math.max(0, Math.min(this.maxScroll, this.scrollPosition));
+        return true;
+      }
+      return false;
+    }
+  }
+
 
 export class WidgetListBox extends Widget {
     constructor(itemHeight = 30) {

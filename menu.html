@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo com Menus em Canvas e JavaScript</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #333;
+        }
+        
+        canvas {
+            border: 1px solid #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- O canvas será criado pelo JavaScript -->
+    
+    <script>
+        // Código do jogo começa aqui
+        class Canvas {
+            constructor(width, height) {
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = width;
+                this.canvas.height = height;
+                this.ctx = this.canvas.getContext('2d');
+                document.body.appendChild(this.canvas);
+            }
+
+            getContext() {
+                return this.ctx;
+            }
+
+            getCanvas() {
+                return this.canvas;
+            }
+
+            clear() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+        }
+
+        class MenuItem {
+            constructor(text, x, y, width, height, action) {
+                this.text = text;
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.action = action;
+                this.isHovered = false;
+            }
+
+            draw(ctx) {
+                // Desenha o fundo do item
+                ctx.fillStyle = this.isHovered ? '#555' : '#333';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Desenha a borda
+                ctx.strokeStyle = '#999';
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                
+                // Desenha o texto
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.text, this.x + this.width / 2, this.y + this.height / 2);
+            }
+
+            isInside(x, y) {
+                return x >= this.x && x <= this.x + this.width && 
+                    y >= this.y && y <= this.y + this.height;
+            }
+
+            onMouseMove(x, y) {
+                this.isHovered = this.isInside(x, y);
+                return this.isHovered;
+            }
+
+            onMouseClick(x, y) {
+                if (this.isInside(x, y) && typeof this.action === 'function') {
+                    this.action();
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        class Menu {
+            constructor(x, y, width) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = 30; // Altura de cada item
+                this.items = [];
+                this.isVisible = true;
+                this.activeSubMenu = null;
+            }
+
+            addItem(text, action) {
+                const y = this.y;
+                const x = this.x + this.items.length * this.width;
+                const item = new MenuItem(text, x, y, this.width, this.height, action);
+                this.items.push(item);
+                return item;
+            }
+
+            draw(ctx) {
+                if (!this.isVisible) return;
+                
+                // Desenha o fundo do menu
+                ctx.fillStyle = '#222';
+                ctx.fillRect(this.x, this.y, this.width * this.items.length, this.height);
+                
+                // Desenha cada item
+                this.items.forEach(item => item.draw(ctx));
+                
+                // Desenha o submenu ativo
+                if (this.activeSubMenu) {
+                    this.activeSubMenu.draw(ctx);
+                }
+            }
+
+            onMouseMove(x, y) {
+                let hovered = false;
+                
+                // Verifica se o mouse está sobre algum item do menu
+                this.items.forEach((item, index) => {
+                    if (item.onMouseMove(x, y)) {
+                        hovered = true;
+                        
+                        // Se houver um submenu associado a este item, mostre-o
+                        if (this.submenus && this.submenus[index]) {
+                            this.activeSubMenu = this.submenus[index];
+                            this.activeSubMenu.isVisible = true;
+                        } else {
+                            this.activeSubMenu = null;
+                        }
+                    }
+                });
+                
+                // Se o mouse estiver sobre o submenu ativo, mantenha-o visível
+                if (this.activeSubMenu && this.activeSubMenu.onMouseMove(x, y)) {
+                    hovered = true;
+                } else if (!hovered) {
+                    // Se o mouse não estiver sobre nenhum item ou submenu, esconda o submenu
+                    if (this.activeSubMenu) {
+                        this.activeSubMenu.isVisible = false;
+                        this.activeSubMenu = null;
+                    }
+                }
+                
+                return hovered;
+            }
+
+            onMouseClick(x, y) {
+                // Verifica se algum item foi clicado
+                for (const item of this.items) {
+                    if (item.onMouseClick(x, y)) {
+                        return true;
+                    }
+                }
+                
+                // Verifica se algum item do submenu foi clicado
+                if (this.activeSubMenu && this.activeSubMenu.onMouseClick(x, y)) {
+                    return true;
+                }
+                
+                return false;
+            }
+        }
+
+        class SubMenu {
+            constructor(parentItem, width) {
+                this.parentItem = parentItem;
+                this.x = parentItem.x;
+                this.y = parentItem.y + parentItem.height;
+                this.width = width || parentItem.width;
+                this.height = 30; // Altura de cada item
+                this.items = [];
+                this.isVisible = false;
+            }
+
+            addItem(text, action) {
+                const y = this.y + this.items.length * this.height;
+                const item = new MenuItem(text, this.x, y, this.width, this.height, action);
+                this.items.push(item);
+                return item;
+            }
+
+            draw(ctx) {
+                if (!this.isVisible) return;
+                
+                // Desenha cada item
+                this.items.forEach(item => item.draw(ctx));
+            }
+
+            onMouseMove(x, y) {
+                if (!this.isVisible) return false;
+                
+                let hovered = false;
+                this.items.forEach(item => {
+                    if (item.onMouseMove(x, y)) {
+                        hovered = true;
+                    }
+                });
+                
+                return hovered;
+            }
+
+            onMouseClick(x, y) {
+                if (!this.isVisible) return false;
+                
+                for (const item of this.items) {
+                    if (item.onMouseClick(x, y)) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+        }
+
+        class ContextMenu {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.width = 150;
+                this.height = 30; // Altura de cada item
+                this.items = [];
+                this.isVisible = false;
+            }
+
+            show(x, y) {
+                this.x = x;
+                this.y = y;
+                this.isVisible = true;
+                
+                // Reposiciona os itens
+                this.items.forEach((item, index) => {
+                    item.x = this.x;
+                    item.y = this.y + index * this.height;
+                });
+            }
+
+            hide() {
+                this.isVisible = false;
+            }
+
+            addItem(text, action) {
+                const y = this.y + this.items.length * this.height;
+                const item = new MenuItem(text, this.x, y, this.width, this.height, action);
+                this.items.push(item);
+                return item;
+            }
+
+            draw(ctx) {
+                if (!this.isVisible) return;
+                
+                // Desenha o fundo do menu
+                ctx.fillStyle = '#222';
+                ctx.fillRect(this.x, this.y, this.width, this.height * this.items.length);
+                
+                // Desenha cada item
+                this.items.forEach(item => item.draw(ctx));
+            }
+
+            onMouseMove(x, y) {
+                if (!this.isVisible) return false;
+                
+                let hovered = false;
+                this.items.forEach(item => {
+                    if (item.onMouseMove(x, y)) {
+                        hovered = true;
+                    }
+                });
+                
+                return hovered;
+            }
+
+            onMouseClick(x, y) {
+                if (!this.isVisible) return false;
+                
+                let clicked = false;
+                for (const item of this.items) {
+                    if (item.onMouseClick(x, y)) {
+                        clicked = true;
+                        this.hide();
+                        break;
+                    }
+                }
+                
+                // Se o clique não foi em nenhum item, esconde o menu
+                if (!clicked && !this.isInside(x, y)) {
+                    this.hide();
+                }
+                
+                return clicked;
+            }
+
+            isInside(x, y) {
+                return x >= this.x && x <= this.x + this.width && 
+                    y >= this.y && y <= this.y + this.height * this.items.length;
+            }
+        }
+
+        class Renderer {
+            constructor(ctx) {
+                this.ctx = ctx;
+            }
+
+            render(game) {
+                // Limpa o canvas
+                this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+                
+                // Desenha o fundo do jogo
+                this.ctx.fillStyle = '#121212';
+                this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+                
+                // Desenha o objeto do jogo
+                game.gameObject.draw(this.ctx);
+                
+                // Desenha o menu principal
+                game.mainMenu.draw(this.ctx);
+                
+                // Desenha o menu de contexto
+                game.contextMenu.draw(this.ctx);
+            }
+        }
+
+        class EventHandler {
+            constructor(game) {
+                this.game = game;
+                this.canvas = game.canvas.getCanvas();
+                
+                // Adiciona evento de movimento do mouse
+                this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
+                
+                // Adiciona evento de clique
+                this.canvas.addEventListener('click', this.onMouseClick.bind(this));
+                
+                // Adiciona evento de clique com botão direito
+                this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this));
+            }
+
+            onMouseMove(event) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                
+                // Verifica se o mouse está sobre o menu principal
+                this.game.mainMenu.onMouseMove(x, y);
+                
+                // Verifica se o mouse está sobre o menu de contexto
+                this.game.contextMenu.onMouseMove(x, y);
+                
+                // Verifica se o mouse está sobre o objeto do jogo
+                this.game.gameObject.onMouseMove(x, y);
+            }
+
+            onMouseClick(event) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                
+                // Verifica se algum item do menu principal foi clicado
+                if (this.game.mainMenu.onMouseClick(x, y)) {
+                    return;
+                }
+                
+                // Verifica se algum item do menu de contexto foi clicado
+                if (this.game.contextMenu.onMouseClick(x, y)) {
+                    return;
+                }
+                
+                // Esconde o menu de contexto quando clicar fora dele
+                this.game.contextMenu.hide();
+                
+                // Verifica se o objeto do jogo foi clicado
+                this.game.gameObject.onMouseClick(x, y);
+            }
+
+            onContextMenu(event) {
+                event.preventDefault();
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                
+                // Mostra o menu de contexto na posição do clique
+                this.game.contextMenu.show(x, y);
+            }
+        }
+
+        class GameObject {
+            constructor(x, y, size) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.color = 'blue';
+                this.isHovered = false;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = this.isHovered ? 'lightblue' : this.color;
+                ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+            }
+
+            onMouseMove(x, y) {
+                this.isHovered = x >= this.x - this.size / 2 && x <= this.x + this.size / 2 && 
+                                y >= this.y - this.size / 2 && y <= this.y + this.size / 2;
+                return this.isHovered;
+            }
+
+            onMouseClick(x, y) {
+                if (this.isHovered) {
+                    // Muda a cor ao clicar
+                    this.color = `rgb(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255})`;
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = new Canvas(800, 600);
+                this.ctx = this.canvas.getContext();
+                this.renderer = new Renderer(this.ctx);
+                
+                // Cria o objeto do jogo
+                this.gameObject = new GameObject(400, 300, 50);
+                
+                // Cria o menu principal
+                this.mainMenu = new Menu(0, 0, 100);
+                
+                // Adiciona itens ao menu principal
+                const fileItem = this.mainMenu.addItem('Arquivo', () => {});
+                const editItem = this.mainMenu.addItem('Editar', () => {});
+                const helpItem = this.mainMenu.addItem('Ajuda', () => {});
+                
+                // Cria submenus
+                this.mainMenu.submenus = [];
+                
+                // Submenu para Arquivo
+                const fileSubMenu = new SubMenu(fileItem);
+                fileSubMenu.addItem('Novo Jogo', () => alert('Novo Jogo selecionado!'));
+                fileSubMenu.addItem('Carregar', () => alert('Carregar selecionado!'));
+                fileSubMenu.addItem('Salvar', () => alert('Salvar selecionado!'));
+                const item = fileSubMenu.addItem('Sair', () => alert('Sair selecionado!'))
+
+                // Submenu para Novo Jogo
+                const newGameSubMenu = new SubMenu(item);
+                newGameSubMenu.addItem('Novo Jogo 1', () => alert('Novo Jogo 1 selecionado!'));
+                newGameSubMenu.addItem('Novo Jogo 2', () => alert('Novo Jogo 2 selecionado!'));
+                newGameSubMenu.addItem('Novo Jogo 3', () => alert('Novo Jogo 3 selecionado!'));
+                newGameSubMenu.addItem('Novo Jogo 4', () => alert('Novo Jogo 4 selecionado!'));
+                newGameSubMenu.addItem('Novo Jogo 5', () => alert('Novo Jogo 5 selecionado!'));
+                
+                this.mainMenu.submenus.push(newGameSubMenu);
+
+
+                this.mainMenu.submenus[0] = fileSubMenu;
+                
+                // Submenu para Editar
+                const editSubMenu = new SubMenu(editItem);
+                editSubMenu.addItem('Desfazer', () => alert('Desfazer selecionado!'));
+                editSubMenu.addItem('Refazer', () => alert('Refazer selecionado!'));
+                this.mainMenu.submenus[1] = editSubMenu;
+                
+                // Submenu para Ajuda
+                const helpSubMenu = new SubMenu(helpItem);
+                helpSubMenu.addItem('Sobre', () => alert('Jogo desenvolvido em Canvas e JS puro!'));
+                this.mainMenu.submenus[2] = helpSubMenu;
+                
+                // Cria o menu de contexto
+                this.contextMenu = new ContextMenu();
+                this.contextMenu.addItem('Mudar Cor', () => {
+                    this.gameObject.color = `rgb(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255})`;
+                });
+                this.contextMenu.addItem('Aumentar', () => {
+                    this.gameObject.size += 10;
+                });
+                this.contextMenu.addItem('Diminuir', () => {
+                    if (this.gameObject.size > 10) {
+                        this.gameObject.size -= 10;
+                    }
+                });
+                
+                // Cria o manipulador de eventos
+                this.eventHandler = new EventHandler(this);
+                
+                // Inicia o loop do jogo
+                this.loop();
+            }
+
+            loop() {
+                // Renderiza a cena
+                this.renderer.render(this);
+                
+                // Continua o loop
+                requestAnimationFrame(this.loop.bind(this));
+            }
+        }
+
+        // Inicia o jogo quando o documento estiver carregado
+        window.onload = function() {
+            const game = new Game();
+        };
+    </script>
+</body>
+</html>

@@ -11,6 +11,8 @@ export class Activity
         this.fragment = null;
         this.virtualWidth = virtualWidth;
         this.virtualHeight = virtualHeight;
+        this.width = virtualWidth;
+        this.height = virtualHeight;
         this.fitMode = fitMode; // "fit", "stretch", "fill"
         Navigator.Instance();
         this.scaleX = 1;
@@ -125,6 +127,8 @@ export class Activity
     resizeCanvas() {
         const w = window.innerWidth;
         const h = window.innerHeight;
+        this.width = w;
+        this.height = h;
         this.canvas.width = w;
         this.canvas.height = h;
 
@@ -247,7 +251,7 @@ export class Activity
             this.ctx.restore();
 
             this.g.setColor("#00ff00");
-            this.g.drawText(`FPS: ${this.fps}`, 10, 10, 14);
+            this.g.drawText(`FPS: ${this.fps}`, 10,this.height-16, 14);
 
             
             Input.update();

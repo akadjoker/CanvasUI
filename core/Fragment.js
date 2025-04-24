@@ -393,7 +393,7 @@ export class Navigator {
     update(g, dt)
     {   
 
-        console.log("update", this.width, this.height);
+      
         if (this.outTransition)
         {
             this.outTransition.width  = this.realWidth;

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widgets OOP em JavaScript Puro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            background-color: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Widgets em JavaScript Orientado a Objetos</h1>
+    
+    <script>
+ // Sistema de Widgets com Button e ScrollView usando Canvas e OOP
+class Widget {
+  constructor(x, y, width, height) {
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.visible = true;
+  }
+  
+  draw(ctx) {
+    // Método a ser sobrescrito pelas subclasses
+  }
+  
+  isPointInside(x, y) {
+    return x >= this.x && x <= this.x + this.width &&
+           y >= this.y && y <= this.y + this.height;
+  }
+  
+  handleMouseDown(x, y) {
+    // Método a ser sobrescrito pelas subclasses
+    return false; // Retorna se o evento foi tratado
+  }
+  
+  handleMouseUp(x, y) {
+    // Método a ser sobrescrito pelas subclasses
+    return false;
+  }
+  
+  handleMouseMove(x, y) {
+    // Método a ser sobrescrito pelas subclasses
+    return false;
+  }
+}
+
+class Button extends Widget {
+  constructor(x, y, width, height, text, onClick) {
+    super(x, y, width, height);
+    this.text = text;
+    this.onClick = onClick;
+    this.isPressed = false;
+    this.hovered = false;
+  }
+  
+  draw(ctx) {
+    // Desenha o fundo do botão
+    ctx.fillStyle = this.isPressed ? '#0066cc' : (this.hovered ? '#4499ee' : '#2288dd');
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+    
+    // Desenha a borda
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.x, this.y, this.width, this.height);
+    
+    // Desenha o texto
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.text, this.x + this.width / 2, this.y + this.height / 2);
+  }
+  
+  handleMouseDown(x, y) {
+    if (this.isPointInside(x, y)) {
+      this.isPressed = true;
+      return true;
+    }
+    return false;
+  }
+  
+  handleMouseUp(x, y) {
+    if (this.isPressed) {
+      this.isPressed = false;
+      if (this.isPointInside(x, y) && this.onClick) {
+        this.onClick();
+      }
+      return true;
+    }
+    return false;
+  }
+  
+  handleMouseMove(x, y) {
+    const wasHovered = this.hovered;
+    this.hovered = this.isPointInside(x, y);
+    return wasHovered !== this.hovered; // Retorna true se o estado mudou
+  }
+}
+
+class ScrollView extends Widget {
+  constructor(x, y, width, height, contentHeight) {
+    super(x, y, width, height);
+    this.contentHeight = contentHeight || height;
+    this.scrollY = 0;
+    this.maxScrollY = Math.max(0, this.contentHeight - this.height);
+    this.children = [];
+    this.isDraggingScrollbar = false;
+    this.scrollbarWidth = 15;
+    this.scrollbarHeight = Math.max(30, (this.height / this.contentHeight) * this.height);
+    this.scrollbarY = 0;
+  }
+  
+  addWidget(widget) {
+    this.children.push(widget);
+  }
+  
+  removeWidget(widget) {
+    const index = this.children.indexOf(widget);
+    if (index !== -1) {
+      this.children.splice(index, 1);
+    }
+  }
+  
+  draw(ctx) {
+    // Salva o estado do contexto para evitar interferências
+    ctx.save();
+    
+    // Define a região de clipping para o conteúdo
+    ctx.beginPath();
+    ctx.rect(this.x, this.y, this.width - this.scrollbarWidth, this.height);
+    ctx.clip();
+    
+    // Aplica a transformação para o scroll
+    ctx.translate(0, -this.scrollY);
+    
+    // Desenha o fundo do ScrollView
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillRect(this.x, this.y + this.scrollY, this.width - this.scrollbarWidth, this.contentHeight);
+    
+    // Desenha todos os widgets filhos
+    for (const widget of this.children) {
+      if (widget.visible && 
+          widget.y + widget.height > this.y + this.scrollY &&
+          widget.y < this.y + this.scrollY + this.height) {
+        widget.draw(ctx);
+      }
+    }
+    
+    // Restaura o estado para desenhar a barra de rolagem
+    ctx.restore();
+    
+    // Desenha o fundo da área da barra de rolagem
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(this.x + this.width - this.scrollbarWidth, this.y, this.scrollbarWidth, this.height);
+    
+    // Calcula e atualiza a posição da barra de rolagem
+    this.scrollbarY = (this.scrollY / this.maxScrollY) * (this.height - this.scrollbarHeight);
+    if (isNaN(this.scrollbarY)) this.scrollbarY = 0;
+    
+    // Desenha a barra de rolagem
+    ctx.fillStyle = this.isDraggingScrollbar ? '#666666' : '#999999';
+    ctx.fillRect(
+      this.x + this.width - this.scrollbarWidth,
+      this.y + this.scrollbarY,
+      this.scrollbarWidth,
+      this.scrollbarHeight
+    );
+    
+    // Desenha a borda do ScrollView
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.x, this.y, this.width, this.height);
+  }
+  
+  updateScrollPosition(y) {
+    const scrollRatio = (y - this.y - this.scrollbarHeight / 2) / (this.height - this.scrollbarHeight);
+    this.scrollY = Math.max(0, Math.min(this.maxScrollY, scrollRatio * this.maxScrollY));
+  }
+  
+  handleMouseDown(x, y) {
+    // Verifica se o clique foi na barra de rolagem
+    if (x >= this.x + this.width - this.scrollbarWidth &&
+        x <= this.x + this.width &&
+        y >= this.y + this.scrollbarY &&
+        y <= this.y + this.scrollbarY + this.scrollbarHeight) {
+      this.isDraggingScrollbar = true;
+      this.lastMouseY = y;
+      return true;
+    }
+    
+    // Caso contrário, verifica se algum dos filhos foi clicado
+    const translatedY = y + this.scrollY;
+    for (let i = this.children.length - 1; i >= 0; i--) {
+      const widget = this.children[i];
+      if (widget.visible && widget.isPointInside(x, translatedY)) {
+        return widget.handleMouseDown(x, translatedY);
+      }
+    }
+    
+    return false;
+  }
+  
+  handleMouseUp(x, y) {
+    if (this.isDraggingScrollbar) {
+      this.isDraggingScrollbar = false;
+      return true;
+    }
+    
+    // Propaga o evento para os filhos
+    const translatedY = y + this.scrollY;
+    for (let i = this.children.length - 1; i >= 0; i--) {
+      const widget = this.children[i];
+      if (widget.visible && widget.handleMouseUp(x, translatedY)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  handleMouseMove(x, y) {
+    if (this.isDraggingScrollbar) {
+      this.updateScrollPosition(y);
+      return true;
+    }
+    
+    // Propaga o evento para os filhos
+    const translatedY = y + this.scrollY;
+    let handled = false;
+    for (let i = this.children.length - 1; i >= 0; i--) {
+      const widget = this.children[i];
+      if (widget.visible && widget.handleMouseMove(x, translatedY)) {
+        handled = true;
+      }
+    }
+    
+    return handled;
+  }
+  
+  handleMouseWheel(deltaY) {
+    const scrollSpeed = 30;
+    this.scrollY = Math.max(0, Math.min(this.maxScrollY, this.scrollY + deltaY * scrollSpeed));
+    return true;
+  }
+}
+
+// Exemplo de uso
+window.onload = function() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 800;
+  canvas.height = 600;
+  document.body.appendChild(canvas);
+  
+  const ctx = canvas.getContext('2d');
+  const widgets = [];
+  
+  // Cria um ScrollView
+  const scrollView = new ScrollView(50, 50, 300, 400, 800);
+  widgets.push(scrollView);
+  
+  // Adiciona botões ao ScrollView
+  for (let i = 0; i < 20; i++) {
+    const button = new Button(
+      60, 
+      70 + i * 40, 
+      260, 
+      30, 
+      `Botão ${i + 1}`, 
+      () => console.log(`Botão ${i + 1} foi clicado!`)
+    );
+    scrollView.addWidget(button);
+  }
+  
+  // Função de desenho principal
+  function draw() {
+    // Limpa o canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Desenha todos os widgets
+    for (const widget of widgets) {
+      if (widget.visible) {
+        widget.draw(ctx);
+      }
+    }
+    
+    // Agenda o próximo frame
+    requestAnimationFrame(draw);
+  }
+  
+  // Inicia o loop de desenho
+  draw();
+  
+  // Manipuladores de eventos do mouse
+  canvas.addEventListener('mousedown', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    for (let i = widgets.length - 1; i >= 0; i--) {
+      const widget = widgets[i];
+      if (widget.visible && widget.isPointInside(x, y) && widget.handleMouseDown(x, y)) {
+        break;
+      }
+    }
+  });
+  
+  canvas.addEventListener('mouseup', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    for (let i = widgets.length - 1; i >= 0; i--) {
+      const widget = widgets[i];
+      if (widget.visible && widget.handleMouseUp(x, y)) {
+        break;
+      }
+    }
+  });
+  
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    for (let i = widgets.length - 1; i >= 0; i--) {
+      const widget = widgets[i];
+      if (widget.visible && widget.handleMouseMove(x, y)) {
+        break;
+      }
+    }
+  });
+  
+  canvas.addEventListener('wheel', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    for (let i = widgets.length - 1; i >= 0; i--) {
+      const widget = widgets[i];
+      if (widget.visible && widget.isPointInside(x, y) && widget instanceof ScrollView) {
+        widget.handleMouseWheel(Math.sign(e.deltaY));
+        e.preventDefault();
+        break;
+      }
+    }
+  });
+};
+    </script>
+</body>
+</html>
