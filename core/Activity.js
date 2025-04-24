@@ -3,7 +3,7 @@ import { Navigator } from "./Fragment.js";
 
 export class Activity
 {
-    constructor(canvas, virtualWidth = 800, virtualHeight = 600, fitMode = "none") 
+    constructor(canvas, virtualWidth = 800, virtualHeight = 600, fitMode = "fit") 
     {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
@@ -28,6 +28,10 @@ export class Activity
         canvas.addEventListener("mousedown", e => this._onMouseDown(e));
         canvas.addEventListener("mouseup", e => this._onMouseUp(e));
         canvas.addEventListener("mousemove", e => this._onMouseMove(e));
+        this._setupTouchAsMouse(canvas);
+
+ 
+
         Input.init();
 
         this.firstRender = true;
@@ -37,6 +41,87 @@ export class Activity
         this._frames = 0;
         this._fpsTime = 0;
     }
+
+    _setupTouchAsMouse(canvas) {
+        const getTouchPos = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0] || e.changedTouches[0];
+            return {
+                clientX: touch.clientX - rect.left,
+                clientY: touch.clientY - rect.top
+            };
+        };
+    
+        canvas.addEventListener("touchstart", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                button: 0,
+                clientX,
+                clientY
+            };
+            this._onMouseDown(fakeMouseEvent);
+            e.preventDefault();
+        });
+    
+        canvas.addEventListener("touchmove", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                clientX,
+                clientY
+            };
+            this._onMouseMove(fakeMouseEvent);
+            e.preventDefault();
+        });
+    
+        canvas.addEventListener("touchend", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                button: 0,
+                clientX,
+                clientY
+            };
+            this._onMouseUp(fakeMouseEvent);
+            e.preventDefault();
+        });
+    
+        canvas.addEventListener("touchcancel", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                button: 0,
+                clientX,
+                clientY
+            };
+            this._onMouseUp(fakeMouseEvent);
+            e.preventDefault();
+        });
+    }
+    
+
+    _onMouseDown(e) {
+        Input.onMouseDown(e.button);
+        const { x, y } = this._getMouseCoords(e);
+        Input.onMouseMove(x, y); // atualiza também a posição
+        this._handleMouse(Input.Mouse.DOWN, x, y, e.button);
+    }
+
+    _onMouseUp(e) {
+        Input.onMouseUp(e.button);
+        const { x, y } = this._getMouseCoords(e);
+        Input.onMouseMove(x, y);
+        this._handleMouse(Input.Mouse.UP, x, y, e.button);
+    }
+
+    _onMouseMove(e) {
+        const { x, y } = this._getMouseCoords(e);
+        Input.onMouseMove(x, y);
+        this._handleMouse(Input.Mouse.MOVE, x, y, -1);
+    }
+
+    _handleMouse(type, x, y, button)
+    {
+        Navigator.Instance().handleMouse(type, x, y, button);
+    }
+
     resizeCanvas() {
         const w = window.innerWidth;
         const h = window.innerHeight;
@@ -109,30 +194,7 @@ export class Activity
         return { x, y };
     }
 
-    _onMouseDown(e) {
-        Input.onMouseDown(e.button);
-        const { x, y } = this._getMouseCoords(e);
-        Input.onMouseMove(x, y); // atualiza também a posição
-        this._handleMouse(Input.Mouse.DOWN, x, y, e.button);
-    }
-
-    _onMouseUp(e) {
-        Input.onMouseUp(e.button);
-        const { x, y } = this._getMouseCoords(e);
-        Input.onMouseMove(x, y);
-        this._handleMouse(Input.Mouse.UP, x, y, e.button);
-    }
-
-    _onMouseMove(e) {
-        const { x, y } = this._getMouseCoords(e);
-        Input.onMouseMove(x, y);
-        this._handleMouse(Input.Mouse.MOVE, x, y, -1);
-    }
-
-    _handleMouse(type, x, y, button)
-    {
-        Navigator.Instance().handleMouse(type, x, y, button);
-    }
+ 
 
     setGraphics(g) {
         this.g = g;
