@@ -17,7 +17,7 @@ class MenuFragment extends Fragment
         this.layout.usePercentage = true;
         //this.layout.debug = true;
 
-        this.layout.add(new Panel("Top")).setHeightPercent(0.1);
+        this.layout.add(new Panel("Top 1")).setHeightPercent(0.1);
         const center = this.layout.add(new HorizontalLayout()).setHeightPercent(0.8);
         center.debug = true;
         center.setMargins(1, 1, 1, 1);
