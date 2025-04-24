@@ -2790,6 +2790,7 @@ export class ListBox extends Widget
         this.scrollStart = 0;
         this.dragging = false;
         this.dragTimer = 0;
+        this.bound = new Rectangle(0, 0, 0, 0);
     }
 
     addItem(text)
@@ -2799,15 +2800,17 @@ export class ListBox extends Widget
 
     handleMouse(type, x, y, button) {
         if (!this.enabled || !this.visible) return false;
-        if (!this.contains(x, y)) return false;
-
+        
         const localY = y - this.y;
-
-        if (type === 0)
+        const localX = x - this.x;
+      //  if (!this.contains(localX, localY)) return false;
+        
+        if (type === 0 && this.contains(x, y))
         { // Mouse down
             this.dragStartY = y;
             this.scrollStart = this.scroll;
             this.dragTimer = 0;
+            this.dragging = false;
             const index = Math.floor((localY + this.scroll) / this.itemHeight);
             if (index >= 0 && index < this.items.length)
                 {
@@ -2821,7 +2824,7 @@ export class ListBox extends Widget
 
         }
 
-        if (type === 1)
+        if (type === 1  && (this.bound.contains(x, y) || this.dragging))
         { // Mouse up
             this.dragging = false;
             this.dragTimer = 0;
@@ -2833,10 +2836,11 @@ export class ListBox extends Widget
             this.itemSelected = false;
             if (this.dragging)
             {
+                this.hoverIndex = -1;
                 const dy = y - this.dragStartY;
                 this.scroll = this.scrollStart - dy;
                 this.clampScroll();
-            } else
+            }  else  if (this.bound.contains(x, y))
             {
                 const index = Math.floor((localY + this.scroll) / this.itemHeight);
                 this.hoverIndex = index;
@@ -2865,9 +2869,11 @@ export class ListBox extends Widget
     
         const visibleCount = Math.min(this.maxVisibleItems, this.items.length);
         const height = visibleCount * this.itemHeight;
-    
+        this.height = height;
         g.setColor(Theme.listBackground);
         g.fillRect(this.x, this.y, this.width, height);
+        this.bound.set(this.x, this.y, this.width, height);
+    
     
         g.save();
         g.clip(this.x, this.y, this.width, height);
@@ -2876,10 +2882,12 @@ export class ListBox extends Widget
         for (let i = 0; i < this.items.length; i++) {
             const itemY = this.y + i * this.itemHeight;
     
-            if (i === this.selectedIndex) {
+            if (i === this.selectedIndex)
+            {
                 g.setColor(this.dragging ? Theme.listSelectedDragging : Theme.listSelected);
                 g.fillRect(this.x, itemY, this.width, this.itemHeight);
-            } else if (i === this.hoverIndex) {
+            } else if (i === this.hoverIndex)
+            {
                 g.setColor(Theme.listHover);
                 g.fillRect(this.x, itemY, this.width, this.itemHeight);
             }

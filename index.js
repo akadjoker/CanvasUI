@@ -37,7 +37,7 @@ class MenuFragment extends Fragment
 
             layout.add(new Panel()).setPosition(5, 70).setSize(190, 450).setColor("#999");
             layout.add(new Label("label")).setPosition(50, 70).setColor("#000");
-            const list = layout.add(new ListBox()).setPosition(20, 100).setSize(150, 90);
+            const list = layout.add(new ListBox()).setPosition(20, 100).setSize(150, 20);
             for (let i = 1; i <= 20; i++) {
                 list.addItem("Item " + i);
             }
