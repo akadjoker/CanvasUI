@@ -3,7 +3,7 @@ import { Navigator } from "./Fragment.js";
 
 export class Activity
 {
-    constructor(canvas, virtualWidth = 800, virtualHeight = 600, fitMode = "fit") 
+    constructor(canvas, virtualWidth = 800, virtualHeight = 600, fitMode = "none") 
     {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
