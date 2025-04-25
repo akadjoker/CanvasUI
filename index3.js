@@ -35,16 +35,16 @@ class MenuFragment extends Fragment
             const layout = body.add(new HorizontalLayout()).setWidthPercent(0.25);
             layout.usePercentage = true;
 
-            layout.setMargins(1, 1, 1, 1);
+            layout.setMargins(1, 5, 5, 1);
 
             layout.add(new Label("label")).setPosition(50, 70).setColor("#fff").setHeightPercent(0.1);
 
-            layout.add(new Button("Button")).setHeightPercent(0.05);
+            layout.add(new Button("Button")).setHeightPercent(0.03);
             
             const toggle = new ToggleButton(true, (on) => {
             
             });
-            toggle.setHeightPercent(0.05);
+            toggle.setHeightPercent(0.03);
             layout.add(toggle);
             const list = layout.add(new ListBox()).setHeightPercent(0.4);
             for (let i = 1; i <= 20; i++)
@@ -70,7 +70,7 @@ class MenuFragment extends Fragment
             for (let i = 0; i < opcoes.length; i++) {
                 group.add(opcoes[i]);
             }
-            group.setHeightPercent(0.3);
+            group.setHeightPercent(0.18);
             layout.add(group);
           
 
@@ -131,23 +131,23 @@ class MenuFragment extends Fragment
         }
         {
             const layout = body.add(new HorizontalLayout()).setWidthPercent(0.45);
-
+            layout.usePercentage = true;
         
             layout.debug = true;
            
             const knob = new Knob(0, 360, 1, 0, (v) => console.log("Knob:", v));
-            knob.setHeightPercent(0.15);
+            knob.setHeightPercent(0.1);
             layout.add(knob);
-
+            
             const circlular = new SliderCircular();//(v) => console.log("Circular:", v));
-            circlular.setHeightPercent(0.15);
+            circlular.setHeightPercent(0.12);
             layout.add(circlular);
-
-            const loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
-            const text = new TextView(loremIpsum);
-            text.setHeightPercent(0.8);
-            layout.add(text);
-           
+            
+            
+                        const loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
+                        const text = new TextView(loremIpsum);
+                        text.setHeightPercent(0.75);
+                        layout.add(text);
             
         }
 
