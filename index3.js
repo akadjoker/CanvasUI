@@ -136,17 +136,17 @@ class MenuFragment extends Fragment
             layout.debug = true;
            
             const knob = new Knob(0, 360, 1, 0, (v) => console.log("Knob:", v));
-            knob.setHeightPercent(0.1);
+            knob.setHeightPercent(0.18);
             layout.add(knob);
             
             const circlular = new SliderCircular();//(v) => console.log("Circular:", v));
-            circlular.setHeightPercent(0.12);
+            circlular.setHeightPercent(0.18);
             layout.add(circlular);
             
             
                         const loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
                         const text = new TextView(loremIpsum);
-                        text.setHeightPercent(0.75);
+                        text.setHeightPercent(0.60);
                         layout.add(text);
             
         }
