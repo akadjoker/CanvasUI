@@ -396,8 +396,8 @@ export class Navigator {
       
         if (this.outTransition)
         {
-            this.outTransition.width  = this.width;
-            this.outTransition.height = this.height;
+            this.outTransition.width  = this.realWidth;
+            this.outTransition.height = this.realHeight;
             this.outTransition.update(dt);
             this.outTransition.render(g);
             if (this.outTransition.isFinished())
@@ -410,8 +410,8 @@ export class Navigator {
     
         if (this.inTransition)
         {
-            this.inTransition.width  = this.width;
-            this.inTransition.height = this.height;
+            this.inTransition.width  = this.realWidth;
+            this.inTransition.height = this.realHeight;
             this.inTransition.update(dt);
             this.inTransition.render(g);
             if (this.inTransition.isFinished())

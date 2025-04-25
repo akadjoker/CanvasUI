@@ -2076,8 +2076,8 @@ export class ProgressBar extends Widget {
             g.fillRect(this.x, this.y, pos, this.height);
             g.setColor(Theme.progressBorder);
             
-            g.drawLine(this.y + pos, this.y , this.x +pos, this.y + this.height);
-        //    g.fillRect(this.y + pos, this.y, 1, this.height);
+            g.drawLine(this.x + pos, this.y , this.x +pos, this.y + this.height);
+ 
             const txt = this.value.toFixed(2);
             const size = g.measureText(txt);
             const w = size.width;
