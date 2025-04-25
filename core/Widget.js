@@ -127,6 +127,9 @@ export class Theme
 
     static windowBorder          = "#000";
 
+    static scrollbarTrack = "rgba(255,255,255,0.1)";
+    static scrollbarThumb = "rgba(255,255,255,0.4)";
+
 
     // Shared
     static highlight = "#4caf50";
@@ -1452,40 +1455,31 @@ export class DragValueField extends Widget {
     
 }
 
-
 export class Checkbox extends Widget {
     constructor(label = "", checked = false, onChange = null) {
         super();
         this.label = label;
         this.checked = checked;
         this.onChange = onChange;
-        this.size = 20;
         this.padding = 5;
+        this.boxSize = 15; // Tamanho fixo da caixa
         this.hovered = false;
-        
     }
 
     handleMouse(type, x, y, button) {
         if (!this.enabled || !this.visible) return false;
-      
+
         this.MouseX = x;
         this.MouseY = y;
-
         this.hovered = false;
 
-      
-
-        if (type === 0 && this.contains(x, y))
-        { // Mouse Down
+        if (type === 0 && this.contains(x, y)) { // Mouse Down
             this.checked = !this.checked;
             if (this.onChange) this.onChange(this.checked);
             return true;
         }
 
-       
-
-        if (type === 2 && this.contains(x, y))
-        { // Mouse Move
+        if (type === 2 && this.contains(x, y)) { // Mouse Move
             this.hovered = true;
             return true;
         }
@@ -1493,62 +1487,64 @@ export class Checkbox extends Widget {
         return false;
     }
 
-    
-
     render(g) {
         if (!this.visible) return;
-    
+
         const boxX = this.x + this.padding;
-        const boxY = this.y + (this.height - this.size) / 2;
-        this.width  = this.size;
-        this.height = this.size;
-    
+        const boxY = this.y + (this.height - this.boxSize) / 2;  
         // Caixa
         g.setColor(this.hovered ? Theme.checkboxHover : Theme.checkboxBackground);
-        //g.setColor(Theme.checkboxBackground);
-        g.fillRect(boxX, boxY, this.size, this.size);
-    
+        g.fillRect(boxX, boxY, this.boxSize, this.boxSize);
+
         // Borda
         g.setColor(Theme.checkboxBorder);
-        g.drawRect(boxX, boxY, this.size, this.size);
-    
+        g.drawRect(boxX, boxY, this.boxSize, this.boxSize);
+
         // Check
-        if (this.checked)
-        {
+        if (this.checked) {
             g.setColor(Theme.checkboxMark);
-            g.drawLine(boxX + 4, boxY + 10, boxX + 9, boxY + 15);
-            g.drawLine(boxX + 9, boxY + 15, boxX + 16, boxY + 5);
+            const startX = boxX + this.boxSize * 0.2;
+            const startY = boxY + this.boxSize * 0.55;
+            const midX   = boxX + this.boxSize * 0.45;
+            const midY   = boxY + this.boxSize * 0.75;
+            const endX   = boxX + this.boxSize * 0.8;
+            const endY   = boxY + this.boxSize * 0.3;
+        
+            g.drawLine(startX, startY, midX, midY);
+            g.drawLine(midX, midY, endX, endY);
         }
-    
+
         // Label
         g.setColor(Theme.checkboxText);
-        g.drawText(this.label, boxX + this.size + this.padding, this.y + (this.height - 14) / 2);
-    
-        if (this.hovered)
-        {
+        g.drawText(this.label, boxX + this.boxSize + this.padding, this.y + (this.height - 14) / 2);
+        
+
+        if (this.hovered) {
             g.setColor(Theme.checkboxOutline);
-            g.drawRect(boxX, boxY, this.size, this.size);
+            g.drawRect(boxX, boxY, this.boxSize, this.boxSize);
         }
+    }
+    setSize(w, h) {
+        this.width = w;
+        this.height = h;
+    
+    
+        this.boxSize = Math.min(this.height - this.padding * 2, this.width * 0.2) ; 
+        this.boxSize = Math.max(16, this.boxSize);  
     }
     
 }
-
-export class CheckboxGroup extends Widget
-{
+export class CheckboxGroup extends Widget {
     constructor(columns = 2) {
         super();
         this.columns = columns;
         this.checkboxes = [];
         this.values = new Map(); // label -> boolean
         this.spacing = 10;
-        this.checkboxSize = 20;
-        this.colWidth = 100;
     }
 
-    add(label, defaultValue = false)
-    {
-        const checkbox = new Checkbox(label, defaultValue, (val) =>
-        {
+    add(label, defaultValue = false) {
+        const checkbox = new Checkbox(label, defaultValue, (val) => {
             this.values.set(label, val);
             if (this.onChange) this.onChange(label, val);
         });
@@ -1558,14 +1554,12 @@ export class CheckboxGroup extends Widget
         return this;
     }
 
-    setOnChange(callback)
-    {
+    setOnChange(callback) {
         this.onChange = callback;
         return this;
     }
 
-    get(label)
-    {
+    get(label) {
         return this.values.get(label);
     }
 
@@ -1574,48 +1568,49 @@ export class CheckboxGroup extends Widget
     }
 
     update(dt) {
-        for (const cb of this.checkboxes)
-        {
+        for (const cb of this.checkboxes) {
             cb.update(dt);
         }
     }
 
-    handleMouse(type, x, y, button)
-    {
-
-
-        for (const cb of this.checkboxes)
-        {
-            if (cb.handleMouse(type, x- this.x , y - this.y , button))
-            {
+    handleMouse(type, x, y, button) {
+        for (const cb of this.checkboxes) {
+            if (cb.handleMouse(type, x - this.x, y - this.y, button)) {
                 return true;
             }
         }
         return false;
     }
 
-  
+    _calculateCellSize() {
+        const totalButtons = this.checkboxes.length;
+        const rows = Math.ceil(totalButtons / this.columns);
+
+        this.colWidth = this.width / this.columns;
+        this.rowHeight = this.height / rows;
+    }
 
     render(g) {
-       
-        const rowHeight = this.checkboxSize + this.spacing;
+        if (!this.visible) return;
+
+        this._calculateCellSize();
+
         g.save();
         g.ctx.translate(this.x, this.y);
 
-        for (let i = 0; i < this.checkboxes.length; i++)
-        {
+        for (let i = 0; i < this.checkboxes.length; i++) {
             const cb = this.checkboxes[i];
             const col = i % this.columns;
             const row = Math.floor(i / this.columns);
 
-            cb.setPosition(col * this.colWidth, row * rowHeight);
+            cb.setSize(this.colWidth, this.rowHeight); // Só para o layout (posição e deteção de clique)
+            cb.setPosition(col * this.colWidth, row * this.rowHeight);
             cb.render(g);
         }
 
         g.restore();
     }
 }
-
 
 export class ToggleButton extends Widget
 {
@@ -1666,7 +1661,8 @@ export class ToggleButton extends Widget
     
         const knobX = this.x + (this.checked ? this.width - this.height : 0) + this.padding;
         const knobY = this.y + this.padding;
-        const knobSize = this.height - 2 * this.padding;
+        let knobSize = this.height - 2 * this.padding;
+        if (knobSize < 1.0) knobSize = 1.0;
       
     
         // Fundo (base do botão)
@@ -1704,7 +1700,7 @@ export class RadioButton extends Widget
         this.value = value;
         this.selected = false;
         this.radius = 8;
-        this.padding = 5;
+        this.padding = 6;
         this.height = 20;
         this.width = 20;
         this.hovered = false;
@@ -1744,9 +1740,12 @@ export class RadioButton extends Widget
     render(g) {
         if (!this.visible) return;
     
+        // this.height - 2 * this.padding;
+        //this.radius = Math.min(this.width-this.padding, this.height) *0.5 ;
+        this.radius = this.height - 2 * this.padding;
+        if (this.radius < 1) this.radius = 1;
         const cx = this.x + this.radius + this.padding;
         const cy = this.y + this.height / 2;
-        this.radius = Math.min(this.width-this.padding, this.height) *0.5 ;
         g.setColor(Theme.radioOuter);
         g.drawCircle(cx, cy, this.radius);
     
@@ -1799,7 +1798,7 @@ export class RadioGroup extends Widget
     {
         const b = new RadioButton(text);
         this.buttons.push(b);
-        this._calculateSize();
+ 
         return b;
     }
 
@@ -1852,56 +1851,91 @@ export class RadioGroup extends Widget
         return false;
     }
 
-
-
     render(g) {
-       
-         
+        this._calculateCellSize();
+    
         g.save();
         g.ctx.translate(this.x, this.y);
-      
-
-        for (let i = 0; i < this.buttons.length; i++)
-        {
+    
+        for (let i = 0; i < this.buttons.length; i++) {
             const cb = this.buttons[i];
             const col = i % this.columns;
             const row = Math.floor(i / this.columns);
- 
-           
-
+    
             cb.setPosition(col * this.colWidth, row * this.rowHeight);
+    
+            // Se quiseres redimensionar os botões para ocupar a célula:
+            // cb.setSize(this.colWidth, this.rowHeight);
+    
             cb.render(g);
         }
-  
-
+    
         g.restore();
-        if (this.outline)
-        {
+    
+        if (this.outline) {
             g.setColor(Theme.radioGroupBorder);
             g.drawRect(this.x - 2, this.y - 2, this.width, this.height);
         }
     }
+    
 
-    _calculateSize() {
-        this.maxWidth = 0;
-        this.maxHeight = 0;
+    // render(g) {
+       
+         
+    //     g.save();
+    //     g.ctx.translate(this.x, this.y);
+      
 
-        for (let i = 0; i < this.buttons.length; i++)
-        {
-            const cb = this.buttons[i];
-            const col = i % this.columns;
-            const row = Math.floor(i / this.columns);
+    //     for (let i = 0; i < this.buttons.length; i++)
+    //     {
+    //         const cb = this.buttons[i];
+    //         const col = i % this.columns;
+    //         const row = Math.floor(i / this.columns);
  
-            const width  = col * this.colWidth + this.spacing + cb.width;
-            const height = row *this.rowHeight+ this.spacing + cb.height;
+           
 
-            this.maxWidth = Math.max(this.maxWidth,   width );
-            this.maxHeight = Math.max(this.maxHeight,  height );
+    //         cb.setPosition(col * this.colWidth, row * this.rowHeight);
+    //         cb.render(g);
+    //     }
+  
 
-        }
-        this.width = this.maxWidth;
-        this.height = this.maxHeight;
+    //     g.restore();
+    //     if (this.outline)
+    //     {
+    //         g.setColor(Theme.radioGroupBorder);
+    //         g.drawRect(this.x - 2, this.y - 2, this.width, this.height);
+    //     }
+    // }
+
+    // _calculateSize()
+    // {
+    //     this.maxWidth = 0;
+    //     this.maxHeight = 0;
+
+    //     for (let i = 0; i < this.buttons.length; i++)
+    //     {
+    //         const cb = this.buttons[i];
+    //         const col = i % this.columns;
+    //         const row = Math.floor(i / this.columns);
+ 
+    //         const width  = col * this.colWidth + this.spacing + cb.width;
+    //         const height = row *this.rowHeight+ this.spacing + cb.height;
+
+    //         this.maxWidth = Math.max(this.maxWidth,   width );
+    //         this.maxHeight = Math.max(this.maxHeight,  height );
+
+    //     }
+    //     this.width = this.maxWidth;
+    //     this.height = this.maxHeight;
    
+    // }
+
+    _calculateCellSize() {
+        const totalButtons = this.buttons.length;
+        const rows = Math.ceil(totalButtons / this.columns);
+    
+        this.colWidth = this.width / this.columns;
+        this.rowHeight = this.height / rows;
     }
 
     
@@ -2004,44 +2038,53 @@ export class Slider extends Widget {
 
     render(g) {
         if (!this.visible) return;
+
+
+        const txt = this.value.toFixed(2);
+        const size = g.measureText(txt);
+        const w = size.width*2;
+        const h = size.height;
+        const offX = w +5
     
         // Track externo
         g.setColor(Theme.sliderBorder);
         if (this.orientation === "horizontal")
-            g.drawRoundedRect(this.x - 3, this.y, this.width + 8, this.height, 4);
+            g.drawRoundedRect(this.x - 3, this.y, (this.width + 8)-offX, this.height, 4);
         else
-            g.drawRoundedRect(this.x, this.y - 4, this.width, this.height + 8, 4);
+            g.drawRoundedRect(this.x, this.y - 4, this.width-offX, this.height + 8, 4);
     
         // Track interior
         g.setColor(Theme.sliderTrack);
         if (this.orientation === "horizontal")
-            g.fillRect(this.x, this.y + this.height / 2 - 3, this.width, 6);
+            g.fillRect(this.x, this.y + this.height / 2 - 3, this.width-offX, 6);
         else
-            g.fillRect(this.x + this.width / 2 - 3, this.y, 6, this.height);
+            g.fillRect(this.x + (this.width-offX) / 2 - 3, this.y, 6, this.height);
     
         // Fill
         const percent = this.getPercent();
         g.setColor(Theme.sliderFill);
         if (this.orientation === "horizontal")
-            g.fillRect(this.x, this.y + this.height / 2 - 3, this.width * percent, 6);
+            g.fillRect(this.x, this.y + this.height / 2 - 3, (this.width-offX) * percent, 6);
         else
-            g.fillRect(this.x + this.width / 2 - 3, this.y + this.height * (1 - percent), 6, this.height * percent);
+            g.fillRect(this.x + (this.widthoffX) / 2 - 3, this.y + this.height * (1 - percent), 6, this.height * percent);
     
         // Thumb
-        if (this.orientation === "horizontal") {
-            const tx = this.x + this.width * percent - 5;
+        if (this.orientation === "horizontal")
+        {
+            const tx = this.x + (this.width-offX) * percent - 5;
             g.setColor(Theme.sliderThumb);
             g.fillCircle(tx + 5, this.y + this.height / 2, 8);
-        } else {
+        } else
+        {
             const ty = this.y + this.height * (1 - percent) - 5;
             g.setColor(Theme.sliderThumb);
-            g.fillCircle(this.x + this.width / 2, ty + 5, 8);
+            g.fillCircle(this.x + (this.width-offX) / 2, ty + 5, 8);
         }
     
         // Valor
         g.setColor(Theme.sliderText);
-        const txt = this.value.toFixed(2);
-        g.drawText(txt, this.x + this.width + 10, this.y + this.height / 2 - 10);
+    
+        g.drawText(txt, this.x + (this.width-offX)+(offX*0.5)-4.0, this.y + this.height *0.5 - (h*0.5));
     }
     
 }
@@ -2072,16 +2115,16 @@ export class ProgressBar extends Widget {
             {
             const pos = this.width * percent;
             
+            const txt = this.value.toFixed(2);
+            const size = g.measureText(txt);
+            const w = size.width;
+            const h = size.height;
             g.setColor(Theme.progressFill);
             g.fillRect(this.x, this.y, pos, this.height);
             g.setColor(Theme.progressBorder);
             
             g.drawLine(this.x + pos, this.y , this.x +pos, this.y + this.height);
  
-            const txt = this.value.toFixed(2);
-            const size = g.measureText(txt);
-            const w = size.width;
-            const h = size.height;
             g.setColor(Theme.progressText);
             g.drawText(txt, this.x + (this.width*0.5) - (w * 0.5) , this.y + (this.height *0.5) - (h * 0.5));
         } else
@@ -2179,6 +2222,9 @@ export class Knob extends Widget {
         const cx = this.x + this.width / 2;
         const cy = this.y + this.height / 2;
         const radius = Math.min(this.width, this.height) / 2 - 10;
+        if (radius < 1.0)
+            radius = 1;
+        this.radius = radius;
     
         const valueRatio = (this.value - this.min) / (this.max - this.min);
         const angle = Math.PI - valueRatio * Math.PI * 2;
@@ -2289,65 +2335,80 @@ export class SliderCircular extends Widget
     {
         const ctx = g.ctx;
         
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        this.radius = Math.min(this.width, this.height) / 2;
+
+        g.save();
+ 
+
+                const cx =this.x +  this.width / 2;
+                const cy =this.y +  this.height / 2;
+                const radius = Math.min(this.width, this.height) / 2;
+                if (radius < 1.0)
+                    radius = 1;
+                this.radius = radius;
+
+            // const cx =  this.width / 2;
+            // const cy =  this.height / 2;
+            // this.radius = Math.min(this.width, this.height) / 2;
+
         
-      // Fundo do knob
-      ctx.fillStyle = '#ecf0f1';
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Borda
-      ctx.strokeStyle = '#bdc3c7';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // Trilho
-      ctx.strokeStyle = '#95a5a6';
-      ctx.lineWidth = 10;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius - 15, this.startAngle, this.endAngle);
-      ctx.stroke();
-      
-      // Valor atual
-      const valueAngle = this.startAngle + (this.endAngle - this.startAngle) * this.value;
-      ctx.strokeStyle = '#3498db';
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius - 15, this.startAngle, valueAngle);
-      ctx.stroke();
-      
-      // Marcador
-      ctx.fillStyle = '#2c3e50';
-      ctx.beginPath();
-      const markerX = this.x + Math.cos(valueAngle) * (this.radius - 15);
-      const markerY = this.y + Math.sin(valueAngle) * (this.radius - 15);
-      ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Valor como texto
-      ctx.fillStyle = '#2c3e50';
-      ctx.font = 'bold 16px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(Math.round(this.value * 100) + '%', this.x, this.y);
-      ctx.lineWidth = 1;
+            // Fundo do knob
+            ctx.fillStyle = '#ecf0f1';
+            ctx.beginPath();
+            ctx.arc(cx,cy, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        
+            
+            // Borda
+            ctx.strokeStyle = '#bdc3c7';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx,cy, this.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Trilho
+            ctx.strokeStyle = '#95a5a6';
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            ctx.arc(cx,cy, this.radius - 15, this.startAngle, this.endAngle);
+            ctx.stroke();
+            
+            // Valor atual
+            const valueAngle = this.startAngle + (this.endAngle - this.startAngle) * this.value;
+            ctx.strokeStyle = '#3498db';
+            ctx.beginPath();
+            ctx.arc(cx,cy, this.radius - 15, this.startAngle, valueAngle);
+            ctx.stroke();
+            
+            // Marcador
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            const markerX = cx + Math.cos(valueAngle) * (this.radius - 15);
+            const markerY = cy + Math.sin(valueAngle) * (this.radius - 15);
+            ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Valor como texto
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(this.value * 100) + '%', cx,cy);
+            ctx.lineWidth = 1;
+            g.restore();
     }
     
     isPointInside(x, y)
     {
-      const dx = x - this.x;
-      const dy = y - this.y;
-      return Math.sqrt(dx * dx + dy * dy) <= this.radius;
+        const dx = x - (this.x + this.width / 2);
+        const dy = y - (this.y + this.height / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        return dist <= this.radius;
     }
     
     _calculateValue(x, y)
     {
-      const dx = x - this.x;
-      const dy = y - this.y;
+        const dx = x - (this.x + this.width / 2);
+        const dy = y - (this.y + this.height / 2);
       let angle = Math.atan2(dy, dx);
     
  
@@ -2753,6 +2814,8 @@ export class ListBox extends Widget
     addItem(text)
     {
         this.items.push(text);
+        const visibleCount = Math.min(this.maxVisibleItems, this.items.length);
+        this.height = visibleCount * this.itemHeight;
     }
 
     handleMouse(type, x, y, button) {
@@ -2799,6 +2862,7 @@ export class ListBox extends Widget
                 const dy = y - this.dragStartY;
                 this.scroll = this.scrollStart - dy;
                 this.clampScroll();
+                return true;
             }  else  if (this.bound.contains(x, y))
             {
                 const index = Math.floor((localY + this.scroll) / this.itemHeight);
@@ -2819,29 +2883,28 @@ export class ListBox extends Widget
     render(g) {
         if (!this.visible) return;
     
-        const visibleCount = Math.min(this.maxVisibleItems, this.items.length);
-        const height = visibleCount * this.itemHeight;
-        this.height = height;
+        const tumb = 10;
         g.setColor(Theme.listBackground);
-        g.fillRect(this.x, this.y, this.width, height);
-        this.bound.set(this.x, this.y, this.width, height);
+        g.fillRect(this.x, this.y, this.width, this.height);
+        this.bound.set(this.x, this.y, this.width, this.height);
     
     
         g.save();
-        g.clip(this.x, this.y, this.width, height);
+        g.clip(this.x, this.y, this.width, this.height);
         g.ctx.translate(0, -this.scroll);
     
-        for (let i = 0; i < this.items.length; i++) {
+        for (let i = 0; i < this.items.length; i++)
+        {
             const itemY = this.y + i * this.itemHeight;
     
             if (i === this.selectedIndex)
             {
                 g.setColor(this.dragging ? Theme.listSelectedDragging : Theme.listSelected);
-                g.fillRect(this.x, itemY, this.width, this.itemHeight);
+                g.fillRect(this.x, itemY, this.width-tumb, this.itemHeight);
             } else if (i === this.hoverIndex)
             {
                 g.setColor(Theme.listHover);
-                g.fillRect(this.x, itemY, this.width, this.itemHeight);
+                g.fillRect(this.x, itemY, this.width-tumb, this.itemHeight);
             }
     
             g.setColor(Theme.listText);
@@ -2850,9 +2913,27 @@ export class ListBox extends Widget
     
         g.ctx.translate(0, this.scroll);
         g.restore();
+
+        const totalHeight = this.items.length * this.itemHeight;
+        if (totalHeight > this.height)
+        {
+            const scrollRatio = this.scroll / (totalHeight - this.height);
+            const thumbHeight = Math.max(20, (this.height / totalHeight) * this.height);
+            const thumbY = this.y + scrollRatio * (this.height - thumbHeight);
+            const barX = this.x + this.width - tumb;
+
+            // Track (barra de fundo)
+            g.setColor(Theme.scrollbarTrack || "rgba(255,255,255,0.1)");
+            g.fillRect(barX, this.y, 4, this.height);
+
+            // Thumb (progresso atual)
+            g.setColor(Theme.scrollbarThumb || "rgba(255,255,255,0.4)");
+            g.fillRect(barX, thumbY, 4, thumbHeight);
+        }
+
     
         g.setColor(Theme.listBorder);
-        g.drawRect(this.x, this.y, this.width, height);
+        g.drawRect(this.x, this.y, this.width, this.height);
     }
     
 
@@ -2867,9 +2948,9 @@ export class ListBox extends Widget
         }
     }
 }
- 
-export class ComboBox extends Widget
-{
+
+
+export class ComboBox extends Widget {
     constructor(items = [], onSelect = null) {
         super();
         this.items = items;
@@ -2887,100 +2968,32 @@ export class ComboBox extends Widget
         this.focus = false;
         this.hovered = false;
         this.pressed = false;
+        this.boxSize = 25;
         this.bound = new Rectangle(0, 0, 0, 0);
         this.clicks = 0;
         this.lastItem = -1;
+
+        // Animação
+        this.listAnimation = 0;  // entre 0 e 1
+        this.listTarget = 0;     // objetivo (0 fechado, 1 aberto)
+        this.listSpeed = 6;      // velocidade da animação
     }
 
     toggleOpen() {
         this.open = !this.open;
+        this.listTarget = this.open ? 1 : 0;
     }
 
-    handleMouse(type, x, y, button)
-    {
-        if (!this.enabled || !this.visible) return false;
-      
+    setSize(w, h) {
+        this.width = w;
+        this.height = h;
+    
+        this.boxSize = Math.min(this.height, this.width * 0.4);
+        this.boxSize = Math.max(20, this.boxSize);
+    
 
-        const localY = y - this.y;
-
-     
-        if (type === 0 && this.contains(x, y))
-        {
-            this.toggleOpen();
-            return true;
-        }
-       
-
-        // Se estiver aberto, verificar clique/scroll
-        if (type === 0)
-        {
-            if (!this.bound.contains(x, y))
-            {
-                this.open = false;
-                return false;
-            }
-            this.dragStartY = y;
-            this.scrollStart = this.scroll;
-            
-            const index = Math.floor((localY + this.scroll - this.height) / this.itemHeight);
-            if (index >= 0 && index < this.items.length)
-            {
-                if (this.lastItem === index)
-                    this.clicks++;
-                else 
-                    this.lastItem = index;
-                this.pressed = true;
-                this.dragTimer = 0;
-                this.selectedIndex = index;
-                if (this.onSelect) this.onSelect(index, this.items[index]);
-
-            }
-            return true;
-        }
-
-        if (type === 1 && this.bound.contains(x, y))
-        {
-            if (this.clicks >= 1)
-            {
-                if (this.open)
-                    this.open = false;
-                this.clicks = 0;
-            }
-            this.dragging = false;
-            this.dragTimer = 0;
-            this.pressed = false;
-            this.hoverIndex = -1;
-        }
-
-        if (type === 2)
-        {
-
-
-            this.hovered = this.contains(x, y);
-            if (this.dragging)
-            {
-                const dy = y - this.dragStartY;
-                this.scroll = this.scrollStart - dy;
-                this.clampScroll();
-                return true;
-            } else
-            {
-                const index = Math.floor((localY + this.scroll - this.height) / this.itemHeight);
-                this.hoverIndex = index;
-            }
-
-                if (!this.bound.contains(x, y) && !this.dragging)
-                {
-                    this.open = false;
-                    
-                }
-
-        }
-
-        return false;
     }
-
-   
+    
 
     clampScroll() {
         const totalHeight = this.items.length * this.itemHeight;
@@ -2988,73 +3001,208 @@ export class ComboBox extends Widget
         const maxScroll = Math.max(0, totalHeight - visibleHeight);
         this.scroll = Math.max(0, Math.min(this.scroll, maxScroll));
     }
+
+    handleMouse(type, x, y, button) {
+        if (!this.enabled || !this.visible) return false;
     
-    update(dt)
-    {
+        const localY = y - this.y; // y relativo ao início do ComboBox
+    
+        if (type === 0)
+        { // Mouse Down
+            if (this.open)
+            {
+                if (this.bound.contains(x, y))
+                {
+                    this.pressed = true;
+                    this.dragStartY = y;//  localY - this.boxSize + this.scroll;  
+                    this.scrollStart = this.scroll;
+                    const index = Math.floor((localY + this.scroll - this.boxSize) / this.itemHeight);
+                    if (index >= 0 && index < this.items.length)
+                    {
+                        this.selectedIndex = index;
+                    
+                    }
+                    return true;
+                } else
+                {
+                    this.toggleOpen();
+                    return false;
+                }
+            } else
+            {
+                if (this.contains(x, y))
+                {
+                    this.toggleOpen();
+                    return true;
+                }
+            }
+        }
+    
+        if (type === 1)
+        { // Mouse Up
+            if (this.dragging)
+            {
+                this.dragging = false;
+            } else if (this.pressed && this.open)
+            {
+                const index = Math.floor((localY + this.scroll - this.boxSize) / this.itemHeight);
+                if (index >= 0 && index < this.items.length)
+                {
+                     this.selectedIndex = index;
+                    if (this.onSelect) this.onSelect(index, this.items[index]);
+                    this.toggleOpen();
+                }
+            }
+            this.pressed = false;
+            this.hoverIndex = -1;
+            this.dragTimer = 0;
+        }
+    
+        if (type === 2)
+        { // Mouse Move
+            this.hovered = this.contains(x, y);
+    
+            if (this.open)
+            {
+                if (this.dragging)
+                {
+                    const dy = y - this.dragStartY;
+                    this.scroll = this.scrollStart - dy;
+                    this.clampScroll();
+                    return true;
+                 } 
+                else
+                {
+                    const index = Math.floor((localY + this.scroll - this.boxSize) / this.itemHeight);
+                    this.hoverIndex = index;
+                }
+            }
+             
+        }
+    
+        return false;
+    }
+    
+    
+
+    update(dt) {
+        if (this.listAnimation !== this.listTarget)
+        {
+            const dir = Math.sign(this.listTarget - this.listAnimation);
+            this.listAnimation += dir * this.listSpeed * dt;
+            if (dir > 0 && this.listAnimation > this.listTarget) this.listAnimation = this.listTarget;
+            if (dir < 0 && this.listAnimation < this.listTarget) this.listAnimation = this.listTarget;
+        }
+    
         if (this.open && this.pressed)
         {
             this.dragTimer += dt;
             if (this.dragTimer > 0.5)
-            {
+            { // 0.5 segundos para ativar dragging
                 this.dragging = true;
             }
+        } else {
+            this.dragTimer = 0;
         }
     }
+    
 
     render(g) {
         if (!this.visible) return;
-    
-        // Caixa principal
+
+        const tumb = 10;
+
+
+                // Atualiza dinamicamente quantos itens visíveis cabem abaixo do botão
+        const availableHeight = this.height - this.boxSize;
+        this.maxVisibleItems = Math.floor(availableHeight / this.itemHeight);
+        this.maxVisibleItems = Math.max(3, this.maxVisibleItems); // garantir pelo menos 3
+
+        // Caixa principal (fechada)
         g.setColor(Theme.comboBackground);
-        g.fillRect(this.x, this.y, this.width, this.height);
-    
+        g.fillRect(this.x, this.y, this.width, this.boxSize);
+
         g.setColor(Theme.comboText);
         const label = this.selectedIndex >= 0 ? this.items[this.selectedIndex] : "Selecionar...";
-        g.drawText(label, this.x + 10, this.y + 8);
-    
+
+        const textY = this.y + (this.boxSize - 14) / 2; // Centro vertical
+        g.drawText(label, this.x + 10, textY);
+
+        // Seta
         g.setColor(Theme.comboArrow);
-        g.drawText(this.open ? "▲" : "▼", this.x + this.width - 20, this.y + 8);
-    
+        g.drawText(this.open ? "▲" : "▼", this.x + this.width - 20, textY);
+
+        // Borda
         g.setColor(Theme.comboBorder);
-        g.drawRect(this.x, this.y, this.width, this.height);
-    
-        this.bound.set(this.x, this.y, this.width, this.height);
-    
-        if (this.open) {
+        g.drawRect(this.x, this.y, this.width, this.boxSize);
+
+        this.bound.set(this.x, this.y, this.width, this.boxSize);
+
+        if (this.listAnimation > 0)
+        {
             const visibleCount = Math.min(this.maxVisibleItems, this.items.length);
-            const listHeight = visibleCount * this.itemHeight;
-    
+            const fullListHeight = visibleCount * this.itemHeight;
+            const listHeight = fullListHeight * this.listAnimation;
+
+            // Fundo da lista
             g.setColor(Theme.comboListBackground);
-            g.fillRect(this.x, this.y + this.height, this.width, listHeight);
-    
+            g.fillRect(this.x, this.y + this.boxSize, this.width, listHeight);
+
             g.save();
             g.ctx.translate(0, -this.scroll);
-    
-            for (let i = 0; i < this.items.length; i++) {
-                const itemY = this.y + this.height + i * this.itemHeight;
-    
-                if (itemY + this.itemHeight - this.scroll > this.y + this.height + listHeight) break;
-                if (itemY - this.scroll < this.y + this.height) continue;
-                if (i === this.selectedIndex) {
+
+            for (let i = 0; i < this.items.length; i++)
+            {
+                const itemY = this.y + this.boxSize + i * this.itemHeight;
+
+                if (itemY + this.itemHeight - this.scroll > this.y + this.boxSize + listHeight) break;
+                if (itemY - this.scroll < this.y + this.boxSize) continue;
+
+                if (i === this.selectedIndex)
+                {
                     g.setColor(this.dragging ? Theme.comboSelectedDragging : Theme.comboListSelect);
-                    g.fillRect(this.x, itemY, this.width, this.itemHeight);
-                } else if (i === this.hoverIndex) {
+                    g.fillRect(this.x, itemY, this.width-tumb, this.itemHeight);
+                } else if (i === this.hoverIndex)
+                {
                     g.setColor(Theme.comboListHover);
-                    g.fillRect(this.x, itemY, this.width, this.itemHeight);
+                    g.fillRect(this.x, itemY, this.width-tumb, this.itemHeight);
                 }
-    
+
                 g.setColor(Theme.comboText);
-                g.drawText(this.items[i], this.x + 10, itemY + 8);
+                const itemTextY = itemY + (this.itemHeight - 14) / 2;
+                g.drawText(this.items[i], this.x + 10, itemTextY);
             }
-    
+
             g.ctx.translate(0, this.scroll);
             g.restore();
-    
+
             g.setColor(Theme.comboBorder);
-            g.drawRect(this.x, this.y + this.height, this.width, listHeight);
-            this.bound.set(this.x, this.y, this.width, this.height + listHeight);
+            g.drawRect(this.x, this.y + this.boxSize, this.width, listHeight);
+
+            this.bound.set(this.x, this.y, this.width, this.boxSize + listHeight);
+
+
+            const totalHeight = this.items.length * this.itemHeight;
+            if (totalHeight > fullListHeight && this.open)
+            {
+                const scrollRatio = this.scroll / (totalHeight - fullListHeight);
+                const thumbHeight = Math.max(20, (fullListHeight / totalHeight) * listHeight);
+                const thumbY = this.y + this.boxSize + scrollRatio * (listHeight - thumbHeight);
+                const barX = this.x + this.width - 8;
+            
+                // Track (barra de fundo)
+                g.setColor(Theme.scrollbarTrack || "rgba(255,255,255,0.1)");
+                g.fillRect(barX, this.y + this.boxSize, 4, listHeight);
+            
+                // Thumb (indicador de progresso)
+                g.setColor(Theme.scrollbarThumb || "rgba(255,255,255,0.4)");
+                g.fillRect(barX, thumbY, 4, thumbHeight);
+            }
+            
+
+
+     
         }
+        
     }
-    
-    
 }

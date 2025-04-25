@@ -12,7 +12,14 @@ export class Layout extends Widget
         this.debug = false;
         this.margin = new Margin(0, 0, 0, 0);
         this.usePercentage = false;
+        this.opaque = false;
+        this.color ="#ccc"
 
+    }
+
+    setColor(color)
+    {
+        this.color = color;
     }
 
     clear()
@@ -44,6 +51,18 @@ export class Layout extends Widget
     render(g)
     {
         if (!this.visible) return;
+
+        if (this.opaque)
+            {
+                const outerX = this.x - this.margin.left;
+                const outerY = this.y - this.margin.top;
+                const outerW = this.width + this.margin.left + this.margin.right;
+                const outerH = this.height + this.margin.top + this.margin.bottom;
+                g.setColor(this.color);
+                g.fillRect(outerX, outerY, outerW, outerH);
+                
+            }
+        
         if (this.debug)
         {
            this.renderDebug(g);
@@ -113,6 +132,7 @@ export class Layout extends Widget
 
         return false;
     }
+
     renderDebug(g) {
         // 1. Área total do widget com margens
         const outerX = this.x - this.margin.left;
@@ -133,13 +153,16 @@ export class Layout extends Widget
     
 }
 
-export class HorizontalLayout extends Layout {
+export class HorizontalLayout extends Layout
+{
     constructor(x = 0, y = 0, width = 100, height = 100) {
         super(x, y, width, height);
         this.setMargins(10, 10, 10, 10);
         this.usePercentage = false;
         this.spacing = 5;
     }
+
+
 
     updateLayout() {
         const count = this.children.length;
@@ -181,6 +204,7 @@ export class HorizontalLayout extends Layout {
             currentY += child.height + spacing;
         }
     }
+   
 }
 
 
