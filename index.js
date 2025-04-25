@@ -135,7 +135,7 @@ class MenuFragment extends Fragment
             knob.setSize(80, 80).setPosition(440, 100);
             layout.add(knob);
 
-            const circlular = new SliderCircular((v) => console.log("Circular:", v));
+            const circlular = new SliderCircular();//(v) => console.log("Circular:", v));
             circlular.setSize(90, 90).setPosition(640, 130);
             layout.add(circlular);
 

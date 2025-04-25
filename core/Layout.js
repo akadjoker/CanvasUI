@@ -74,27 +74,42 @@ export class Layout extends Widget
       
 
         let ignore = -1;
-        
-        // propagar do topo (último desenhado) para o fundo
-        for (let i = this.children.length - 1; i >= 0; i--)
+      
+        if (type === 1)
         {
-            const child = this.children[i];
-            if (child.handleMouse(type, x, y, button))
-            {
-                ignore = i;
-                break;
-            }
-        
-        }
-
-        for (let i = this.children.length - 1; i >= 0; i--)
-        {
-            if (i !== ignore)
+            for (let i = this.children.length - 1; i >= 0; i--)
             {
                 const child = this.children[i];
-                child.handleMouseOut(x, y);
+                if (child.handleMouse(1, x, y, button))
+                {
+
+                }
             }
         }
+        // propagar do topo (último desenhado) para o fundo
+        if (type === 0 || type === 2)
+        {
+            for (let i = this.children.length - 1; i >= 0; i--)
+            {
+                const child = this.children[i];
+                if (child.handleMouse(type, x, y, button))
+                {
+                  //  return true;
+                    ignore = i;
+                    break;
+                }
+            
+            }
+        }
+
+        // for (let i = this.children.length - 1; i >= 0; i--)
+        // {
+        //     if (i !== ignore)
+        //     {
+        //         const child = this.children[i];
+        //         child.handleMouseOut(x, y);
+        //     }
+        // }
 
         return false;
     }

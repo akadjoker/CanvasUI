@@ -68,10 +68,10 @@ export class Theme
     
 
     // RadioButton
-    static radioOuter = "#333";
+    static radioOuter = "#555";
     static radioInner = "#444";
     static radioText = "#000";
-    static radioHoverOutline = "rgba(40,40,40,0.6)";
+    static radioHoverOutline = "rgba(0,0,0,0.9)";
 
     //RadioGroup
     static radioGroupBackground = "#ccc";
@@ -350,13 +350,13 @@ export class Theme
         Theme.progressBackground = "#000";
         Theme.progressFill = "#0f0";
         Theme.progressBorder = "#0f0";
-        Theme.progressText = "#0f0";
+        Theme.progressText = "#fff";
     
-        Theme.sliderTrack = "#050";
-        Theme.sliderFill = "#0f0";
+        Theme.sliderTrack = "#080";
+        Theme.sliderFill = "#020";
         Theme.sliderThumb = "#0f0";
-        Theme.sliderBorder = "#0f0";
-        Theme.sliderText = "#0f0";
+        Theme.sliderBorder = "#020";
+        Theme.sliderText = "#fff";
     
         Theme.radioOuter = "#0f0";
         Theme.radioInner = "#0f0";
@@ -444,7 +444,7 @@ export class Theme
         Theme.sliderTrack = "#333";
         Theme.sliderFill = "#0ff";
         Theme.sliderThumb = "#f0f";
-        Theme.sliderBorder = "#0ff";
+        Theme.sliderBorder = "#aff";
         Theme.sliderText = "#fff";
     
         Theme.radioOuter = "#0ff";
@@ -502,6 +502,11 @@ export class Theme
         Theme.buttonPress = "#d0d0d0";
         Theme.buttonLabel = "#222";
         Theme.buttonBorder = "#aaa";
+        Theme.buttonBackground = "#dddddd";
+        Theme.buttonHover = "#eeeeee";
+        Theme.buttonPress = "#cccccc";
+        Theme.buttonLabel = "#000000";
+        Theme.buttonBorder = "#888";
     
         Theme.comboBackground = "#fff";
         Theme.comboText = "#000";
@@ -536,10 +541,10 @@ export class Theme
         Theme.sliderBorder = "#aaa";
         Theme.sliderText = "#000";
     
-        Theme.radioOuter = "#666";
-        Theme.radioInner = "#888";
+        Theme.radioOuter = "#555";
+        Theme.radioInner = "#444";
         Theme.radioText = "#000";
-        Theme.radioHoverOutline = "rgba(0,0,0,0.2)";
+        Theme.radioHoverOutline = "rgba(0,0,0,0.9)";
     
         Theme.radioGroupBackground = "#eee";
         Theme.radioGroupBorder = "#999";
@@ -644,7 +649,7 @@ export class Widget
     render(g)    {       }
 
     handleMouse(type, x, y, button) { return false; }
-    handleMouseOut(x, y)    {              return false;    }
+    
 
     contains(px, py)
     {
@@ -738,31 +743,37 @@ export class Button extends Widget {
     handleMouse(type, x, y, button)
     {
         if (!this.enabled) return false;
-        if (!this.contains(x, y)) return false;
-
-       // console.log("handleMouse",this.text, type, x, y, button);
-        // Mouse.MOVE
-      
-        this.focus = true;
         
-        if (type === 0)
+    
+            if (type === 2 && this.contains(x, y))
+            {
+                this.hovered = true;
+                this.focus = true;
+            
+            } else 
+            {
+                this.hovered = false;
+                this.focus = false;
+            }
+ 
+
+        
+            if (type === 0 && this.contains(x, y))
             { // Mouse.DOWN
                 this.pressed = true;
                 return true;
             }
             
-            if (type === 1)
-                { // Mouse.UP
-            if (this.pressed && this.onClick) this.onClick();
-            this.pressed = false;
-            return true;
-        }
+            if (type === 1 && this.contains(x, y))
+            { // Mouse.UP
+               // if (this.pressed && this.onClick)
+                 //   this.onClick();
+                this.pressed = false;
+                
+                return true;
+           }
         
-        if (this.contains(x, y))
-        {
-            this.hovered = true;
-            return true;
-        }
+        
     
         
 
@@ -770,40 +781,33 @@ export class Button extends Widget {
     }
   
 
-    handleMouseOut(x, y)
-    {
-        if (!this.enabled) return false;
-        if (!this.contains(x, y))
-        {
-            this.hovered = false;
-            this.focus = false;
-            this.pressed = false;
-            return true;
-        }
-        return false;
-    }
+   
 
     render(g)
     {
         if (!this.visible) return;
     
         let color = Theme.buttonBackground;
-        if (this.pressed)
-        {
-            color = Theme.buttonPress;
-        } else if (this.hovered)
+        if (this.hovered)
         {
             color = Theme.buttonHover;
         }  
+        if (this.pressed)
+        {
+            color = Theme.buttonPress;
+        }
+
+       
         // 1. Fundo do botão
         g.setColor(color);
-        g.fillRect(this.x, this.y, this.width, this.height);
+        //g.fillRect(this.x, this.y, this.width, this.height);
+        g.drawRoundedRect(this.x, this.y, this.width, this.height, 8);
 
         const l = Theme.buttonBorderWidth;
     
         // 2. Borda
         g.setColor(Theme.buttonBorder);
-        g.drawRect(this.x, this.y, this.width, this.height);
+        g.drawRoundedLinesRect(this.x, this.y, this.width, this.height,8);
     
         // 3. Texto com padding aplicado
         const len = g.measureText(this.text);
@@ -1012,30 +1016,35 @@ export class TabView extends Widget {
     }
     
 
-    handleMouseOut(x, y) {
-        if (!this.visible) return false;
+    handleMouseOut(x, y)
+    {
+     
 
         const localX = x - this.x;
         const localY = y - this.y;
         const Y = this.position === "top" ? this.headerHeight : 0;
         const active = this.tabs[this.activeIndex];
-        if (active && active.content) {
-            active.content.handleMouseOut(localX - active.content.x, localY - active.content.y - Y);
-        }
+        // if (active && active.content)
+        // {
+        //     active.content.handleMouseOut(localX - active.content.x, localY - active.content.y - Y);
+        // }
 
-        for (let i = 0; i < this.tabs.length; i++) {
+        for (let i = 0; i < this.tabs.length; i++)
+        {
             if (!this.tabs[i].bounds.contains(x, y)) this.tabs[i].over = false;
         }
     }
 
-    handleMouse(type, x, y, button) {
+    handleMouse(type, x, y, button)
+    {
         if (!this.visible) return false;
         const headerY = this.position === "top" ? this.y : (this.y + this.height - this.headerHeight);
         const localX = x - this.x;
         const localY = y - this.y;
         const Y = this.position === "top" ? this.headerHeight : 0;
 
-        if (type === 0) {
+        if (type === 0)
+        { // Mouse Down
             if (this.maxScroll > 0)
             {
                 if (x >= this.x && x <= this.x + 20)
@@ -1076,10 +1085,18 @@ export class TabView extends Widget {
             }
         }
 
-        if (type === 2) {
-            for (let i = 0; i < this.tabs.length; i++) {
+        if (type === 1)
+        { // Mouse Up
+            this.handleMouseOut(x, y);
+        }
+
+        if (type === 2)
+        { // Mouse Move
+            for (let i = 0; i < this.tabs.length; i++)
+            {
                 this.tabs[i].over = false;
-                if (this.tabs[i].bounds.contains(x, y) && i !== this.activeIndex) {
+                if (this.tabs[i].bounds.contains(x, y) && i !== this.activeIndex)
+                {
                     this.tabs[i].over = true;
                     return true;
                 }
@@ -1087,7 +1104,8 @@ export class TabView extends Widget {
         }
 
         const active = this.tabs[this.activeIndex];
-        if (active && active.content) {
+        if (active && active.content)
+        {
             return active.content.handleMouse(type, localX - active.content.x, localY - active.content.y - Y, button);
         }
         return false;
@@ -1130,12 +1148,7 @@ export class Window extends Widget
     }
 
 
-    handleMouseOut(x, y)
-    {
-        const localX = x - this.x;
-        const localY = y - this.y;
-        return this.layout.handleMouseOut( localX - this.layout.x,localY - this.layout.y -this.barHeight);
-    }
+
 
     handleMouse(type, x, y, button)
     {
@@ -1187,7 +1200,7 @@ export class Window extends Widget
 
   
 
-        if (type === 1)
+        if (type === 1 && this.contains(x, y))
         { // Mouse up
             this.dragging = false;
             this.resizing = false;
@@ -1373,22 +1386,18 @@ export class DragValueField extends Widget {
         if (this.onChange) this.onChange(this.value);
     }
 
-    handleMouseOut(x, y)
-    {
-        this.dragging = false;
-        this.hovered = false;
-    }
+ 
 
     handleMouse(type, x, y, button)
     {
         if (!this.visible) return false;
-        if (!this.contains(x, y))  return false;
+        //if (!this.contains(x, y))  return false;
       
 
-        if (type === 0)
+        if (type === 0 && this.contains(x, y))
         {
             this.dragging = true;
-            this.startX = x;
+            this.startX =  x;
             this.startValue = this.value;
             return true;
         }
@@ -1396,7 +1405,8 @@ export class DragValueField extends Widget {
         if (type === 1)
         {
             this.dragging = false;
-            return true;
+            this.hovered = false;
+           // return true;
         }
  
         if (type === 2 && this.dragging)
@@ -1461,21 +1471,20 @@ export class Checkbox extends Widget {
         this.MouseX = x;
         this.MouseY = y;
 
-        if (!this.contains(x, y)) return false;
+        this.hovered = false;
 
-        if (type === 0)
+      
+
+        if (type === 0 && this.contains(x, y))
         { // Mouse Down
             this.checked = !this.checked;
             if (this.onChange) this.onChange(this.checked);
             return true;
         }
 
-        if (type === 1)
-        { // Mouse Up
-            return true;
-        }
+       
 
-        if (type === 2)
+        if (type === 2 && this.contains(x, y))
         { // Mouse Move
             this.hovered = true;
             return true;
@@ -1484,11 +1493,7 @@ export class Checkbox extends Widget {
         return false;
     }
 
-    handleMouseOut(x, y)
-    {
-        this.hovered = false;
-        return false;
-    }
+    
 
     render(g) {
         if (!this.visible) return;
@@ -1589,12 +1594,7 @@ export class CheckboxGroup extends Widget
         return false;
     }
 
-    handleMouseOut(x, y) {
-        for (const cb of this.checkboxes)
-        {
-            cb.handleMouseOut(x- this.x , y - this.y );
-        }
-    }
+  
 
     render(g) {
        
@@ -1635,29 +1635,28 @@ export class ToggleButton extends Widget
         this.fontSize = 12;
     }
 
-    handleMouseOut(x, y) {
-        this.hovered = false;
-        return false;
-    }
+   
 
     handleMouse(type, x, y, button) {
         if (!this.enabled || !this.visible) return false;
-        if (!this.contains(x, y)) return false;
-
-        if (type === 0) { // Mouse Down
+        this.hovered = false;
+        
+        if (type === 0 && this.contains(x, y))
+        { // Mouse Down
             this.checked = !this.checked;
             if (this.onChange) this.onChange(this.checked);
             return true;
         }
 
-        if (type === 1) { // Mouse Up
-            return true;
-        }
-
-        if (type === 2) { // Mouse Move
+            
+        
+       
+        if (type === 2 && this.contains(x, y))
+        { // Mouse Move
             this.hovered = true;
             return true;
         }
+
 
         return false;
     }
@@ -1668,6 +1667,7 @@ export class ToggleButton extends Widget
         const knobX = this.x + (this.checked ? this.width - this.height : 0) + this.padding;
         const knobY = this.y + this.padding;
         const knobSize = this.height - 2 * this.padding;
+      
     
         // Fundo (base do botão)
         g.setColor(this.checked ? Theme.toggleBackgroundChecked : Theme.toggleBackground);
@@ -1706,19 +1706,18 @@ export class RadioButton extends Widget
         this.radius = 8;
         this.padding = 5;
         this.height = 20;
+        this.width = 20;
         this.hovered = false;
 
         
     }
-
-    handleMouseOut(x, y) {
-        this.hovered = false;
-    }
-
+ 
     handleMouse(type, x, y, button)
     {
         this.MouseX = x;
         this.MouseY = y;
+
+        this.hovered = false;
 
         if (!this.enabled || !this.visible) return false;
         if (!this.contains(x, y)) return false;
@@ -1729,10 +1728,7 @@ export class RadioButton extends Widget
             return true;
         }
 
-        if (type === 1)
-        { // Mouse Up
-            return true;
-        }
+       
 
         if (type === 2)
         { // Mouse Move
@@ -1750,11 +1746,12 @@ export class RadioButton extends Widget
     
         const cx = this.x + this.radius + this.padding;
         const cy = this.y + this.height / 2;
-    
+        this.radius = Math.min(this.width-this.padding, this.height) *0.5 ;
         g.setColor(Theme.radioOuter);
         g.drawCircle(cx, cy, this.radius);
     
-        if (this.selected) {
+        if (this.selected)
+        {
             g.setColor(Theme.radioInner);
             g.fillCircle(cx, cy, this.radius - 3);
         }
@@ -1762,10 +1759,12 @@ export class RadioButton extends Widget
         g.setColor(Theme.radioText);
         g.drawText(this.label, cx + this.radius + this.padding, this.y + 5);
     
-        if (this.hovered) {
+        if (this.hovered)
+        {
             g.setColor(Theme.radioHoverOutline);
             g.drawCircle(cx, cy, this.radius);
         }
+       // g.drawRect(this.x, this.y, this.width, this.height);
     }
     
 }
@@ -1853,13 +1852,7 @@ export class RadioGroup extends Widget
         return false;
     }
 
-    handleMouseOut(x, y)
-    {
-        for (const cb of this.buttons)
-        {
-            cb.handleMouseOut(x- this.x , y - this.y );
-        }
-    }
+
 
     render(g) {
        
@@ -1991,7 +1984,7 @@ export class Slider extends Widget {
 
         if (type === 1) { // Mouse up
             this.dragging = false;
-            return true;
+            
         }
 
         if (type === 2 && this.dragging) { // Mouse move
@@ -2007,9 +2000,7 @@ export class Slider extends Widget {
         return false;
     }
 
-    handleMouseOut() {
-        this.dragging = false;
-    }
+   
 
     render(g) {
         if (!this.visible) return;
@@ -2122,7 +2113,10 @@ export class Knob extends Widget {
         this.hovered = false;
     }
 
-    contains(x, y) {
+ 
+
+    isPointInside(x, y)
+    {
         const dx = x - (this.x + this.width / 2);
         const dy = y - (this.y + this.height / 2);
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -2134,10 +2128,7 @@ export class Knob extends Widget {
         return Math.round(val / this.step) * this.step;
     }
 
-    handleMouseOut() {
-        this.dragging = false;
-        this.hovered = false;
-    }
+  
 
     getValueRatio() {
         return (this.value - this.min) / (this.max - this.min);
@@ -2151,7 +2142,7 @@ export class Knob extends Widget {
     handleMouse(type, x, y, button) {
         if (!this.enabled || !this.visible) return false;
         
-        if (type === 0 && this.contains(x, y))
+        if (type === 0 && this.isPointInside(x, y))
         { // DOWN
             const dx = x - (this.x + this.width / 2);
             const dy = y - (this.y + this.height / 2);
@@ -2177,11 +2168,7 @@ export class Knob extends Widget {
             return true;
         }
 
-        if (type === 2 && this.contains(x,y))
-            { // MOVE
-            this.hovered = true;    
-            return true;
-            }
+    
 
         return false;
     }
@@ -2198,6 +2185,8 @@ export class Knob extends Widget {
     
         const pointerX = cx + radius * Math.cos(angle);
         const pointerY = cy + radius * Math.sin(angle);
+
+        this.hovered = this.isPointInside(Input.mouseX, Input.mouseY);
     
         // Base
         g.setColor(Theme.knobBackground);
@@ -2205,19 +2194,24 @@ export class Knob extends Widget {
     
         // Ponteiro
         g.setColor(Theme.knobPointer);
+        g.setLineWidth(3);
+        if (this.dragging)
+            g.setLineWidth(5);
         g.drawLine(cx, cy, pointerX, pointerY);
-    
         // Texto
         g.setColor(Theme.knobText);
         const valText = this.value.toFixed(2);
         const text = g.measureText(valText);
         g.drawText(valText, cx - text.width / 2, cy + text.height / 2);
-    
-        if (this.hovered) {
+        g.setLineWidth(1);
+        
+        if (this.hovered || this.dragging)
+        {
             g.setColor(Theme.knobHoverOutline);
+          //  g.setLineWidth(4);
             g.drawCircle(cx, cy, this.radius);
         }
-    
+        
         // Marcadores (0°, 90°, 180°, 270°)
         g.setColor(Theme.knobMarkers);
         for (let a = 0; a < 360; a += 90) {
@@ -2239,9 +2233,9 @@ export class SliderCircular extends Widget
     {
         
         super();
-        //x - radius, y - radius, radius * 2, radius * 2
 
-      this.radius = 50;
+
+      this.radius = 0;
       this.value = 0.5; // 0 to 1
       this.isDragging = false;
       this.startAngle = -0.75 * Math.PI;
@@ -2249,26 +2243,23 @@ export class SliderCircular extends Widget
       this.onChange = onChange || function() {};
     }
 
-    handleMouseOut()
-    {
-       
-    }
+ 
 
     handleMouse(type, x, y, button)
     {
         if (!this.enabled || !this.visible) return false;
         
-        if (type === 0 && this.contains(x, y))
+        if (type === 0 && this.isPointInside(x, y))
         { // DOWN
-            if (this.handleMouseDown(x, y)) {
-                return true;
-            }
+            this.isDragging = true;
+            return true;
         }
-
-        if (type === 1) { // UP
-            if (this.handleMouseUp(x, y)) {
-                return true;
-            }
+  
+        
+        if (type === 1)
+        { // UP
+ 
+            this.isDragging = false;
         }
 
        
@@ -2276,9 +2267,17 @@ export class SliderCircular extends Widget
         if (type === 2 )
         { // MOVE
 
-            if (this.handleMouseMove(x, y)) {
+                if (this.isDragging)
+                {
+                    const oldValue = this.value;
+                    this.value = this._calculateValue(x, y);
+                
+                    if (oldValue !== this.value)
+                    {
+                      this.onChange(this.value);
+                    }
                 return true;
-            }
+              }
             
         }
 
@@ -2364,37 +2363,11 @@ export class SliderCircular extends Widget
       return (angle - this.startAngle) / (this.endAngle - this.startAngle);
     }
     
-    handleMouseMove(x, y)
-    {
-        if (this.isDragging)
-        {
-            const oldValue = this.value;
-            this.value = this._calculateValue(x, y);
-        
-            if (oldValue !== this.value)
-            {
-              this.onChange(this.value);
-        }
-        return true;
-      }
-      return this.isPointInside(x, y);
-    }
+ 
     
-    handleMouseDown(x, y)
-    {
-        if (this.isPointInside(x, y))
-        {
-        this.isDragging = true;
-        return true;
-      }
-      return false;
-    }
     
-    handleMouseUp(x, y)
-    {
-      this.isDragging = false;
-      return this.isPointInside(x, y);
-    }
+    
+   
 }
   
 export class TextView extends Widget
@@ -2498,10 +2471,7 @@ export class TextView extends Widget
              y <= this.y + this.height;
     }
 
-    handleMouseOut()
-    {
-       
-    }
+
 
     handleMouse(type, x, y, button)
     {
@@ -2515,9 +2485,7 @@ export class TextView extends Widget
         }
 
         if (type === 1) { // UP
-            if (this.handleMouseUp(x, y)) {
-                return true;
-            }
+            this.isDraggingScroll = false;
         }
 
        
@@ -2557,11 +2525,7 @@ export class TextView extends Widget
       return this.contains(x, y);
     }
     
-    handleMouseUp(x, y)
-    {
-      this.isDraggingScroll = false;
-      return this.contains(x, y);
-    }
+ 
     
     handleWheel(deltaY)
     {
@@ -2640,13 +2604,6 @@ export class WidgetListBox extends Widget {
         return false;
     }
 
-
-    handleMouseOut(x, y) {
-        for (const item of this.items)
-        {
-            item.handleMouseOut(x, y);
-        }
-    }
 
     scrollBy(dy) {
         const contentHeight = this._getContentHeight();
@@ -2821,13 +2778,15 @@ export class ListBox extends Widget
                     this.onSelect(index, this.items[index]);
                 }
             }
-
+            //return true;
         }
 
-        if (type === 1  && (this.bound.contains(x, y) || this.dragging))
+        if (type === 1)
         { // Mouse up
             this.dragging = false;
+            this.hoverIndex = -1;
             this.dragTimer = 0;
+            this.itemSelected = false;
         }
 
         if (type === 2)
@@ -2847,17 +2806,10 @@ export class ListBox extends Widget
             }
         }
 
-        return true;
+        return false;
     }
 
-    handleMouseOut()
-    {
-        this.hoverIndex = -1;
-        this.dragging = false;
-        this.dragTimer = 0;
-        this.itemSelected = false;
-
-    }
+ 
 
     clampScroll() {
         const maxScroll = Math.max(0, this.items.length * this.itemHeight - this.maxVisibleItems * this.itemHeight);
@@ -2997,7 +2949,7 @@ export class ComboBox extends Widget
             this.dragging = false;
             this.dragTimer = 0;
             this.pressed = false;
-            return true;
+            this.hoverIndex = -1;
         }
 
         if (type === 2)
@@ -3010,6 +2962,7 @@ export class ComboBox extends Widget
                 const dy = y - this.dragStartY;
                 this.scroll = this.scrollStart - dy;
                 this.clampScroll();
+                return true;
             } else
             {
                 const index = Math.floor((localY + this.scroll - this.height) / this.itemHeight);
@@ -3022,19 +2975,12 @@ export class ComboBox extends Widget
                     
                 }
 
-            return true;
         }
 
         return false;
     }
 
-    handleMouseOut()
-    {
-        this.hoverIndex = -1;
-        this.dragging = false;
-        this.dragTimer = 0;
-        this.pressed = false;
-    }
+   
 
     clampScroll() {
         const totalHeight = this.items.length * this.itemHeight;
