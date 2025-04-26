@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Layout System Test</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            background: #222;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+class Widget {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.width = 0;
+        this.height = 0;
+    }
+
+    update(dt) {}
+    render(ctx) {}
+
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+class Button extends Widget {
+    constructor(text) {
+        super();
+        this.text = text;
+    }
+
+    render(ctx) {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        ctx.fillStyle = "white";
+        ctx.font = "16px Arial";
+        ctx.textBaseline = "middle";
+        ctx.fillText(this.text, this.x + 10, this.y + this.height / 2);
+    }
+}
+
+class LayoutSlot {
+    constructor(align, sizePercent, child, margin = { top: 0, bottom: 0, left: 0, right: 0 }) {
+        this.align = align;
+        this.sizePercent = sizePercent;
+        this.child = child;
+        this.margin = margin;
+    }
+}
+
+class LayoutController extends Widget {
+    constructor() {
+        super();
+        this.slots = [];
+        this.spacing = 0;
+    }
+
+    addSlot(align, sizePercent, child, margin = { top: 0, bottom: 0, left: 0, right: 0 }) {
+        this.slots.push(new LayoutSlot(align, sizePercent, child, margin));
+    }
+
+    updateLayout() {
+        let offsetTop = 0, offsetBottom = 0, offsetLeft = 0, offsetRight = 0;
+        let verticalSlots = this.slots.filter(s => s.align === "top" || s.align === "bottom");
+        let horizontalSlots = this.slots.filter(s => s.align === "left" || s.align === "right");
+
+        // Normalize percent
+        for (let slots of [verticalSlots, horizontalSlots]) {
+            let total = slots.reduce((sum, s) => sum + s.sizePercent, 0);
+            if (total > 100) {
+                for (let s of slots) {
+                    s.sizePercent = s.sizePercent * 100 / total;
+                }
+            }
+        }
+
+        for (let slot of this.slots) {
+            if (!slot.child) continue;
+            let margin = slot.margin || { top: 0, bottom: 0, left: 0, right: 0 };
+
+            if (slot.align === "top") {
+                let availableHeight = this.height - offsetTop - offsetBottom - (this.spacing * (verticalSlots.length - 1));
+                let slotHeight = availableHeight * (slot.sizePercent / 100);
+
+                slot.child.x = this.x + offsetLeft + margin.left;
+                slot.child.y = this.y + offsetTop + margin.top;
+                slot.child.width = this.width - offsetLeft - offsetRight - margin.left - margin.right;
+                slot.child.height = slotHeight - margin.top - margin.bottom;
+
+                offsetTop += slotHeight + this.spacing;
+            }
+            else if (slot.align === "bottom") {
+                let availableHeight = this.height - offsetTop - offsetBottom - (this.spacing * (verticalSlots.length - 1));
+                let slotHeight = availableHeight * (slot.sizePercent / 100);
+
+                slot.child.x = this.x + offsetLeft + margin.left;
+                slot.child.y = this.y + this.height - offsetBottom - slotHeight + margin.top;
+                slot.child.width = this.width - offsetLeft - offsetRight - margin.left - margin.right;
+                slot.child.height = slotHeight - margin.top - margin.bottom;
+
+                offsetBottom += slotHeight + this.spacing;
+            }
+            else if (slot.align === "left") {
+                let availableWidth = this.width - offsetLeft - offsetRight - (this.spacing * (horizontalSlots.length - 1));
+                let slotWidth = availableWidth * (slot.sizePercent / 100);
+
+                slot.child.x = this.x + offsetLeft + margin.left;
+                slot.child.y = this.y + offsetTop + margin.top;
+                slot.child.width = slotWidth - margin.left - margin.right;
+                slot.child.height = this.height - offsetTop - offsetBottom - margin.top - margin.bottom;
+
+                offsetLeft += slotWidth + this.spacing;
+            }
+            else if (slot.align === "right") {
+                let availableWidth = this.width - offsetLeft - offsetRight - (this.spacing * (horizontalSlots.length - 1));
+                let slotWidth = availableWidth * (slot.sizePercent / 100);
+
+                slot.child.x = this.x + this.width - offsetRight - slotWidth + margin.left;
+                slot.child.y = this.y + offsetTop + margin.top;
+                slot.child.width = slotWidth - margin.left - margin.right;
+                slot.child.height = this.height - offsetTop - offsetBottom - margin.top - margin.bottom;
+
+                offsetRight += slotWidth + this.spacing;
+            }
+
+            if (slot.child instanceof LayoutController) {
+                slot.child.updateLayout();
+            }
+        }
+    }
+
+    render(ctx) {
+        for (let slot of this.slots) {
+            if (slot.child) {
+                slot.child.render(ctx);
+            }
+        }
+    }
+
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+
+        for (let slot of this.slots) {
+            if (slot.child) {
+                slot.child.debugDraw(ctx);
+            }
+        }
+    }
+}
+
+// -- Inicialização --
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const rootLayout = new LayoutController();
+rootLayout.spacing = 0;
+resizeCanvas();
+
+// Criação do layout
+const topLayout = new LayoutController();
+topLayout.spacing = 0;
+
+rootLayout.addSlot("top", 20, topLayout, { top: 1, bottom: 1, left: 1, right: 1 });
+rootLayout.addSlot("top", 80, new Button("Main Content"), { top: 1, bottom: 1, left: 2, right: 1 });
+
+topLayout.addSlot("left", 50, new Button("Menu"));
+topLayout.addSlot("right", 50, new Button("Title"));
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rootLayout.updateLayout();
+    rootLayout.render(ctx);
+    rootLayout.debugDraw(ctx);
+    requestAnimationFrame(loop);
+}
+
+loop();
+
+window.addEventListener('resize', resizeCanvas);
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    rootLayout.width = canvas.width;
+    rootLayout.height = canvas.height;
+}
+</script>
+</body>
+</html>

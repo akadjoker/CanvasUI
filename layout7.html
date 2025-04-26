@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Layout Horizontal e Vertical</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { background: #222; display: block; }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+class Widget {
+    constructor() {
+        this.x = 0; this.y = 0; this.width = 0; this.height = 0;
+    }
+    update(dt) {}
+    render(ctx) {}
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+class Button extends Widget {
+    constructor(text, color = "blue") {
+        super();
+        this.text = text;
+        this.color = color;
+    }
+    render(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        ctx.fillStyle = "white";
+        ctx.font = "16px Arial";
+        ctx.textBaseline = "middle";
+        ctx.fillText(this.text, this.x + 10, this.y + this.height/2);
+    }
+}
+class LayoutHorizontal extends Widget {
+    constructor() {
+        super();
+        this.children = [];
+        this.spacing = 0;
+    }
+
+    addChild(percent, widget) {
+        this.children.push({ percent, widget });
+    }
+
+    updateLayout() {
+        let totalPercent = this.children.reduce((sum, c) => sum + c.percent, 0);
+        if (totalPercent !== 100) {
+            for (let child of this.children) {
+                child.percent = (child.percent / totalPercent) * 100;
+            }
+        }
+
+        let totalWidth = this.width - (this.children.length - 1) * this.spacing;
+        let offsetX = this.x;
+
+        for (let child of this.children) {
+            child.widget.x = offsetX;
+            child.widget.y = this.y;
+            child.widget.width = totalWidth * (child.percent / 100);
+            child.widget.height = this.height;
+
+            offsetX += child.widget.width + this.spacing;
+
+            if (typeof child.widget.updateLayout === "function") {
+                child.widget.updateLayout();
+            }
+        }
+    }
+
+    render(ctx) {
+        for (let child of this.children) {
+            child.widget.render(ctx);
+        }
+    }
+
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+        for (let child of this.children) {
+            child.widget.debugDraw(ctx);
+        }
+    }
+}
+class LayoutVertical extends Widget {
+    constructor() {
+        super();
+        this.children = [];
+        this.spacing = 0;
+    }
+
+    addChild(percent, widget) {
+        this.children.push({ percent, widget });
+    }
+
+    updateLayout() {
+        let totalPercent = this.children.reduce((sum, c) => sum + c.percent, 0);
+        if (totalPercent !== 100) {
+            for (let child of this.children) {
+                child.percent = (child.percent / totalPercent) * 100;
+            }
+        }
+
+        let totalHeight = this.height - (this.children.length - 1) * this.spacing;
+        let offsetY = this.y;
+
+        for (let child of this.children) {
+            child.widget.x = this.x;
+            child.widget.y = offsetY;
+            child.widget.width = this.width;
+            child.widget.height = totalHeight * (child.percent / 100);
+
+            offsetY += child.widget.height + this.spacing;
+
+            if (typeof child.widget.updateLayout === "function") {
+                child.widget.updateLayout();
+            }
+        }
+    }
+
+    render(ctx) {
+        for (let child of this.children) {
+            child.widget.render(ctx);
+        }
+    }
+
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+        for (let child of this.children) {
+            child.widget.debugDraw(ctx);
+        }
+    }
+}
+
+
+// --- Inicialização ---
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// Criação da estrutura
+const rootLayout = new LayoutVertical();
+rootLayout.spacing = 25;
+resizeCanvas();
+
+const topBar = new LayoutHorizontal();
+topBar.spacing =25;
+topBar.addChild(50, new Button("Button 1", "#3366cc"));
+topBar.addChild(50, new Button("Button 2", "#6699ff"));
+
+const body = new LayoutHorizontal();
+body.spacing = 5;
+body.addChild(10, new Button("Right", "#ccaa66"));
+body.addChild(80, new Button("Main Content", "#33cc66"));
+body.addChild(10, new Button("Sidebar", "#cc33cc"));
+
+const bottomBar = new Button("Bottom Bar", "#3366cc");
+
+rootLayout.addChild(10, topBar);
+rootLayout.addChild(80, body);
+rootLayout.addChild(10, bottomBar);
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rootLayout.updateLayout();
+    rootLayout.render(ctx);
+    rootLayout.debugDraw(ctx);
+    requestAnimationFrame(loop);
+}
+
+loop();
+
+window.addEventListener('resize', resizeCanvas);
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    rootLayout.x = 0;
+    rootLayout.y = 0;
+    rootLayout.width = canvas.width;
+    rootLayout.height = canvas.height;
+}
+</script>
+</body>
+</html>

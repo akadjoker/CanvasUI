@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Layout Controller Canvas</title>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <script>
+        class Widget {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.children = [];
+                this.backgroundColor = '#f0f0f0';
+                this.borderColor = '#333';
+            }
+
+            addChild(widget) {
+                this.children.push(widget);
+                return this;
+            }
+
+            draw(ctx) {
+                // Desenha o widget principal
+                ctx.fillStyle = this.backgroundColor;
+                ctx.strokeStyle = this.borderColor;
+                ctx.lineWidth = 2;
+                
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                
+                // Desenha os filhos
+                for (const child of this.children) {
+                    child.draw(ctx);
+                }
+            }
+        }
+
+        class LayoutController extends Widget {
+            constructor(x, y, width, height) {
+                super(x, y, width, height);
+                this.layouts = [];
+            }
+
+            addTopBar(heightPercent) {
+                const height = this.height * (heightPercent / 100);
+                const topBar = new Widget(this.x, this.y, this.width, height);
+                topBar.backgroundColor = '#aaccff';
+                this.addChild(topBar);
+                return topBar;
+            }
+
+            addVerticalSection(widthPercent, heightPercent) {
+                // Calcula a posição baseada nos widgets existentes
+                let lastY = this.y;
+                let lastHeight = 0;
+                
+                if (this.children.length > 0) {
+                    const lastChild = this.children[this.children.length - 1];
+                    lastY = lastChild.y + lastChild.height;
+                    lastHeight = lastChild.height;
+                }
+                
+                const width = this.width * (widthPercent / 100);
+                const height = this.height * (heightPercent / 100);
+                
+                const section = new Widget(this.x, lastY, width, height);
+                section.backgroundColor = this.getRandomColor();
+                this.addChild(section);
+                return section;
+            }
+
+            getRandomColor() {
+                const colors = ['#ffaaaa', '#aaffaa', '#aaaaff', '#ffffaa', '#ffaaff', '#aaffff'];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+        }
+
+        class Button extends Widget {
+            constructor(x, y, width, height, text, onClick) {
+                super(x, y, width, height);
+                this.text = text;
+                this.onClick = onClick;
+                this.backgroundColor = '#4CAF50';
+                this.textColor = '#fff';
+            }
+
+            draw(ctx) {
+                super.draw(ctx);
+                
+                // Desenha o texto
+                ctx.fillStyle = this.textColor;
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.text, this.x + this.width/2, this.y + this.height/2);
+            }
+
+            isPointInside(x, y) {
+                return x >= this.x && x <= this.x + this.width &&
+                       y >= this.y && y <= this.y + this.height;
+            }
+        }
+
+        // Inicialização
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const layoutController = new LayoutController(50, 50, 700, 500);
+        
+        // Cria botões de teste
+        const testButton1 = new Button(50, 10, 200, 30, 'Criar Layout Topo + 3 Seções', () => {
+            // Limpa filhos existentes
+            layoutController.children = [];
+            
+            // Adiciona top bar (20% da altura)
+            layoutController.addTopBar(20);
+            
+            // Adiciona 3 seções verticais (cada uma com 80% da altura restante / 3)
+            layoutController.addVerticalSection(100, 80/3);
+            layoutController.addVerticalSection(100, 80/3);
+            layoutController.addVerticalSection(100, 80/3);
+            
+            drawAll();
+        });
+        
+        const testButton2 = new Button(260, 10, 200, 30, 'Layout Complexo', () => {
+            layoutController.children = [];
+            
+            layoutController.addTopBar(15);
+            
+            // Seção esquerda 30% largura, 85% altura restante
+            const leftSection = layoutController.addVerticalSection(30, 85);
+            leftSection.addChild(new Widget(
+                leftSection.x + 10, 
+                leftSection.y + 10, 
+                leftSection.width - 20, 
+                leftSection.height - 20
+            )).backgroundColor = '#ffcccc';
+            
+            // Seção direita 70% largura, dividida em 3
+            layoutController.addVerticalSection(70, 85/3);
+            layoutController.addVerticalSection(70, 85/3);
+            layoutController.addVerticalSection(70, 85/3);
+            
+            drawAll();
+        });
+
+        function drawAll() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            layoutController.draw(ctx);
+            testButton1.draw(ctx);
+            testButton2.draw(ctx);
+        }
+
+        // Event listeners
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (testButton1.isPointInside(x, y)) {
+                testButton1.onClick();
+            } else if (testButton2.isPointInside(x, y)) {
+                testButton2.onClick();
+            }
+        });
+
+        // Desenha inicial
+        drawAll();
+    </script>
+</body>
+</html>

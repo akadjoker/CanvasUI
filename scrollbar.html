@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test WidgetScrollBar</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { background: #222; display: block; }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+// --- Renderer ---
+class Renderer {
+    constructor(ctx) {
+        this.ctx = ctx;
+    }
+    save() { this.ctx.save(); }
+    restore() { this.ctx.restore(); }
+    drawRect(x, y, w, h, color) {
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(x, y, w, h);
+    }
+}
+
+// --- Widget Base ---
+class Widget {
+    constructor() {
+        this.x = 0; this.y = 0;
+        this.width = 0; this.height = 0;
+    }
+    updateLayout() {}
+    render(renderer) {}
+    debugDraw(renderer) {
+        renderer.ctx.strokeStyle = "red";
+        renderer.ctx.strokeRect(this.x, this.y, this.width, this.height);
+    }
+}
+
+class WidgetScrollBar extends Widget {
+    constructor(orientation = "vertical") {
+        super();
+        this.orientation = orientation; // "vertical" ou "horizontal"
+
+        this.trackColor = "#444";
+        this.thumbColor = "#888";
+
+        this.scrollValue = 0; // de 0.0 a 1.0
+        this.visibleRatio = 0.2; // 20% visível inicialmente
+
+        this.dragging = false;
+        this.dragStartMouse = 0;
+        this.dragStartScroll = 0;
+    }
+
+    render(renderer) {
+        renderer.drawRect(this.x, this.y, this.width, this.height, this.trackColor);
+
+        if (this.orientation === "vertical") {
+            const thumbHeight = this.height * this.visibleRatio;
+            const thumbY = this.y + this.scrollValue * (this.height - thumbHeight);
+            this.thumbX = this.x;
+            this.thumbY = thumbY;
+            this.thumbWidth = this.width;
+            this.thumbHeight = thumbHeight;
+
+            renderer.drawRect(this.thumbX, this.thumbY, this.thumbWidth, this.thumbHeight, this.thumbColor);
+        } else {
+            const thumbWidth = this.width * this.visibleRatio;
+            const thumbX = this.x + this.scrollValue * (this.width - thumbWidth);
+            this.thumbX = thumbX;
+            this.thumbY = this.y;
+            this.thumbWidth = thumbWidth;
+            this.thumbHeight = this.height;
+
+            renderer.drawRect(this.thumbX, this.thumbY, this.thumbWidth, this.thumbHeight, this.thumbColor);
+        }
+    }
+
+    setContent(totalSize, viewSize) {
+        if (totalSize <= viewSize) {
+            this.visibleRatio = 1;
+        } else {
+            this.visibleRatio = viewSize / totalSize;
+        }
+    }
+
+    scrollBy(delta) {
+        this.scrollValue = Math.max(0, Math.min(1, this.scrollValue + delta));
+    }
+
+    isInsideThumb(mx, my) {
+        return mx >= this.thumbX && mx <= this.thumbX + this.thumbWidth &&
+               my >= this.thumbY && my <= this.thumbY + this.thumbHeight;
+    }
+
+    onMouseDown(mx, my) {
+        if (this.isInsideThumb(mx, my)) {
+            this.dragging = true;
+            this.dragStartMouse = (this.orientation === "vertical") ? my : mx;
+            this.dragStartScroll = this.scrollValue;
+        }
+    }
+
+    onMouseMove(mx, my) {
+        if (this.dragging) {
+            const totalMove = (this.orientation === "vertical") ? my - this.dragStartMouse : mx - this.dragStartMouse;
+            const totalLength = (this.orientation === "vertical") ? this.height - this.thumbHeight : this.width - this.thumbWidth;
+            if (totalLength > 0) {
+                this.scrollValue = this.dragStartScroll + (totalMove / totalLength);
+                this.scrollValue = Math.max(0, Math.min(1, this.scrollValue));
+            }
+        }
+    }
+
+    onMouseUp() {
+        this.dragging = false;
+    }
+}
+
+
+// --- Setup ---
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const renderer = new Renderer(ctx);
+
+// Criar a ScrollBar de teste
+const scrollBar = new WidgetScrollBar("vertical");
+scrollBar.x = window.innerWidth - 20;
+scrollBar.y = 0;
+scrollBar.width = 20;
+scrollBar.height = window.innerHeight;
+scrollBar.setContent(2000, window.innerHeight); // Exemplo: conteúdo de 2000px, vista só no tamanho da janela
+
+// Resize
+window.addEventListener('resize', resizeCanvas);
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    scrollBar.x = window.innerWidth - 20;
+    scrollBar.height = window.innerHeight;
+}
+resizeCanvas();
+
+window.addEventListener('mousedown', (e) => {
+    scrollBar.onMouseDown(e.clientX, e.clientY);
+});
+window.addEventListener('mousemove', (e) => {
+    scrollBar.onMouseMove(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', (e) => {
+    scrollBar.onMouseUp();
+});
+
+// Scroll com rato
+window.addEventListener('wheel', (e) => {
+    scrollBar.scrollBy(e.deltaY * 0.001);
+});
+
+// Loop
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    scrollBar.render(renderer);
+    scrollBar.debugDraw(renderer);
+    requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

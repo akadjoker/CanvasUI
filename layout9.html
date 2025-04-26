@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Responsivo com Min/Max Constraints</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // Configuração inicial do canvas para ocupar toda a tela
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Função para ajustar o tamanho do canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Se o sistema UI já estiver inicializado, atualizar layouts
+            if (window.uiSystem) {
+                // Atualizar o tamanho do layout principal
+                window.mainLayout.width = canvas.width - 20;
+                window.mainLayout.height = canvas.height - 20;
+                
+                // Atualizar posições e tamanhos de todos os componentes
+                window.mainLayout.updateLayout();
+                
+                // Renderizar novamente
+                window.uiSystem.render();
+            }
+        }
+        
+        // Classe base para componentes UI
+        class UIComponent {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.visible = true;
+                
+                // Adicionar propriedades min/max
+                this.minWidth = 10;
+                this.minHeight = 10;
+                this.maxWidth = Infinity;
+                this.maxHeight = Infinity;
+            }
+            
+            // Método para definir limites mínimos
+            setMinSize(minWidth, minHeight) {
+                this.minWidth = minWidth;
+                this.minHeight = minHeight;
+                return this; // Permite encadeamento de métodos
+            }
+            
+            // Método para definir limites máximos
+            setMaxSize(maxWidth, maxHeight) {
+                this.maxWidth = maxWidth;
+                this.maxHeight = maxHeight;
+                return this; // Permite encadeamento de métodos
+            }
+            
+            // Método para aplicar restrições de tamanho
+            applyConstraints() {
+                this.width = Math.max(this.minWidth, Math.min(this.width, this.maxWidth));
+                this.height = Math.max(this.minHeight, Math.min(this.height, this.maxHeight));
+            }
+            
+            contains(x, y) {
+                return (
+                    x >= this.x && 
+                    x <= this.x + this.width && 
+                    y >= this.y && 
+                    y <= this.y + this.height
+                );
+            }
+            
+            render(ctx) {
+                // Para ser implementado pelas subclasses
+            }
+        }
+        
+        // Classe para botões
+        class Button extends UIComponent {
+            constructor(x, y, width, height, text, onClick) {
+                super(x, y, width, height);
+                this.text = text;
+                this.onClick = onClick;
+                this.hovered = false;
+                this.pressed = false;
+                this.bgColor = '#3498db';
+                this.hoverColor = '#2980b9';
+                this.pressColor = '#1c5c85';
+                this.textColor = '#ffffff';
+                
+                // Definir tamanho mínimo padrão para botões
+                this.minWidth = 60;
+                this.minHeight = 30;
+            }
+            
+            render(ctx) {
+                if (!this.visible) return;
+                
+                // Aplicar restrições
+                this.applyConstraints();
+                
+                // Determinar cor de fundo baseado no estado
+                let bgColor = this.bgColor;
+                if (this.pressed) {
+                    bgColor = this.pressColor;
+                } else if (this.hovered) {
+                    bgColor = this.hoverColor;
+                }
+                
+                // Desenhar fundo do botão
+                ctx.fillStyle = bgColor;
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y, this.width, this.height, 4);
+                ctx.fill();
+                
+                // Desenhar borda
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Ajustar tamanho da fonte com base no tamanho do botão
+                const fontSize = Math.min(16, Math.max(10, Math.min(this.width / 8, this.height / 2)));
+                
+                // Desenhar texto
+                ctx.fillStyle = this.textColor;
+                ctx.font = `${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Limitar texto para caber no botão
+                let displayText = this.text;
+                ctx.save();
+                ctx.textBaseline = 'middle';
+                
+                // Medir o texto
+                let textWidth = ctx.measureText(displayText).width;
+                
+                // Se o texto for muito grande, truncar com ...
+                if (textWidth > this.width - 20) {
+                    let ellipsis = '...';
+                    let truncatedText = displayText;
+                    
+                    while (truncatedText.length > 0 && ctx.measureText(truncatedText + ellipsis).width > this.width - 20) {
+                        truncatedText = truncatedText.slice(0, -1);
+                    }
+                    
+                    displayText = truncatedText + ellipsis;
+                }
+                
+                ctx.fillText(displayText, this.x + this.width / 2, this.y + this.height / 2);
+                ctx.restore();
+            }
+        }
+        
+        // Classe para layout horizontal
+        class HorizontalLayout extends UIComponent {
+            constructor(x, y, width, height) {
+                super(x, y, width, height);
+                this.children = [];
+                this.percentages = [];
+                this.padding = 5;
+            }
+            
+            addChild(component, percentage) {
+                this.children.push(component);
+                this.percentages.push(percentage);
+                this.updateLayout();
+                return component; // Permitir encadeamento
+            }
+            
+            updateLayout() {
+                // Verificar se as porcentagens somam 100%
+                const totalPercentage = this.percentages.reduce((sum, p) => sum + p, 0);
+                if (totalPercentage > 0) {
+                    // Normalizar percentagens se necessário
+                    const factor = 100 / totalPercentage;
+                    if (factor !== 1) {
+                        this.percentages = this.percentages.map(p => p * factor);
+                    }
+                }
+                
+                // Aplicar restrições de tamanho
+                this.applyConstraints();
+                
+                // Calcular espaço total disponível após padding
+                const availableWidth = this.width - (this.padding * 2);
+                
+                // Primeira passagem: calcular tamanhos ideais com base nas porcentagens
+                const idealWidths = this.percentages.map(p => availableWidth * p / 100);
+                
+                // Segunda passagem: ajustar para respeitar min/max
+                const adjustedWidths = [];
+                let totalAllocated = 0;
+                let remainingFlexible = this.children.length;
+                
+                // Aplicar restrições mínimas primeiro
+                for (let i = 0; i < this.children.length; i++) {
+                    const child = this.children[i];
+                    const idealWidth = idealWidths[i];
+                    
+                    if (idealWidth <= child.minWidth) {
+                        // Se o tamanho ideal for menor que o mínimo, usar o mínimo
+                        adjustedWidths[i] = child.minWidth;
+                        totalAllocated += child.minWidth;
+                        remainingFlexible--;
+                    } else if (idealWidth >= child.maxWidth) {
+                        // Se o tamanho ideal for maior que o máximo, usar o máximo
+                        adjustedWidths[i] = child.maxWidth;
+                        totalAllocated += child.maxWidth;
+                        remainingFlexible--;
+                    } else {
+                        // Marcar para distribuição flexível na próxima passagem
+                        adjustedWidths[i] = null;
+                    }
+                }
+                
+                // Distribuir o espaço restante para componentes flexíveis
+                if (remainingFlexible > 0) {
+                    const remainingWidth = availableWidth - totalAllocated;
+                    const widthPerFlexible = remainingWidth / remainingFlexible;
+                    
+                    for (let i = 0; i < adjustedWidths.length; i++) {
+                        if (adjustedWidths[i] === null) {
+                            // Distribuir igualmente entre os restantes
+                            adjustedWidths[i] = widthPerFlexible;
+                        }
+                    }
+                }
+                
+                // Aplicar os tamanhos calculados
+                let currentX = this.x + this.padding;
+                const gap = this.children.length > 1 ? this.padding : 0;
+                
+                for (let i = 0; i < this.children.length; i++) {
+                    const child = this.children[i];
+                    
+                    child.x = currentX;
+                    child.y = this.y + this.padding;
+                    child.width = adjustedWidths[i] - (i < this.children.length - 1 ? gap : 0);
+                    child.height = this.height - (this.padding * 2);
+                    
+                    // Garantir que as restrições sejam aplicadas
+                    child.applyConstraints();
+                    
+                    currentX += child.width + gap;
+                    
+                    // Se o filho for um layout, atualizar recursivamente
+                    if (child instanceof HorizontalLayout || child instanceof VerticalLayout) {
+                        child.updateLayout();
+                    }
+                }
+            }
+            
+            render(ctx) {
+                if (!this.visible) return;
+                
+                // Aplicar restrições
+                this.applyConstraints();
+                
+                // Desenhar fundo do layout (opcional)
+                ctx.fillStyle = 'rgba(240, 240, 240, 0.5)';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Renderizar cada filho
+                for (const child of this.children) {
+                    child.render(ctx);
+                }
+            }
+            
+            contains(x, y) {
+                if (!super.contains(x, y)) return false;
+                
+                // Verificar se algum filho contém o ponto
+                for (const child of this.children) {
+                    if (child.contains(x, y)) {
+                        return true;
+                    }
+                }
+                
+                return true;
+            }
+        }
+        
+        // Classe para layout vertical
+        class VerticalLayout extends UIComponent {
+            constructor(x, y, width, height) {
+                super(x, y, width, height);
+                this.children = [];
+                this.percentages = [];
+                this.padding = 5;
+            }
+            
+            addChild(component, percentage) {
+                this.children.push(component);
+                this.percentages.push(percentage);
+                this.updateLayout();
+                return component; // Permitir encadeamento
+            }
+            
+            updateLayout() {
+                // Verificar se as porcentagens somam 100%
+                const totalPercentage = this.percentages.reduce((sum, p) => sum + p, 0);
+                if (totalPercentage > 0) {
+                    // Normalizar percentagens se necessário
+                    const factor = 100 / totalPercentage;
+                    if (factor !== 1) {
+                        this.percentages = this.percentages.map(p => p * factor);
+                    }
+                }
+                
+                // Aplicar restrições de tamanho
+                this.applyConstraints();
+                
+                // Calcular espaço total disponível após padding
+                const availableHeight = this.height - (this.padding * 2);
+                
+                // Primeira passagem: calcular tamanhos ideais com base nas porcentagens
+                const idealHeights = this.percentages.map(p => availableHeight * p / 100);
+                
+                // Segunda passagem: ajustar para respeitar min/max
+                const adjustedHeights = [];
+                let totalAllocated = 0;
+                let remainingFlexible = this.children.length;
+                
+                // Aplicar restrições mínimas primeiro
+                for (let i = 0; i < this.children.length; i++) {
+                    const child = this.children[i];
+                    const idealHeight = idealHeights[i];
+                    
+                    if (idealHeight <= child.minHeight) {
+                        // Se o tamanho ideal for menor que o mínimo, usar o mínimo
+                        adjustedHeights[i] = child.minHeight;
+                        totalAllocated += child.minHeight;
+                        remainingFlexible--;
+                    } else if (idealHeight >= child.maxHeight) {
+                        // Se o tamanho ideal for maior que o máximo, usar o máximo
+                        adjustedHeights[i] = child.maxHeight;
+                        totalAllocated += child.maxHeight;
+                        remainingFlexible--;
+                    } else {
+                        // Marcar para distribuição flexível na próxima passagem
+                        adjustedHeights[i] = null;
+                    }
+                }
+                
+                // Distribuir o espaço restante para componentes flexíveis
+                if (remainingFlexible > 0) {
+                    const remainingHeight = availableHeight - totalAllocated;
+                    const heightPerFlexible = remainingHeight / remainingFlexible;
+                    
+                    for (let i = 0; i < adjustedHeights.length; i++) {
+                        if (adjustedHeights[i] === null) {
+                            // Distribuir igualmente entre os restantes
+                            adjustedHeights[i] = heightPerFlexible;
+                        }
+                    }
+                }
+                
+                // Aplicar os tamanhos calculados
+                let currentY = this.y + this.padding;
+                const gap = this.children.length > 1 ? this.padding : 0;
+                
+                for (let i = 0; i < this.children.length; i++) {
+                    const child = this.children[i];
+                    
+                    child.x = this.x + this.padding;
+                    child.y = currentY;
+                    child.width = this.width - (this.padding * 2);
+                    child.height = adjustedHeights[i] - (i < this.children.length - 1 ? gap : 0);
+                    
+                    // Garantir que as restrições sejam aplicadas
+                    child.applyConstraints();
+                    
+                    currentY += child.height + gap;
+                    
+                    // Se o filho for um layout, atualizar recursivamente
+                    if (child instanceof HorizontalLayout || child instanceof VerticalLayout) {
+                        child.updateLayout();
+                    }
+                }
+            }
+            
+            render(ctx) {
+                if (!this.visible) return;
+                
+                // Aplicar restrições
+                this.applyConstraints();
+                
+                // Desenhar fundo do layout (opcional)
+                ctx.fillStyle = 'rgba(240, 240, 240, 0.5)';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Renderizar cada filho
+                for (const child of this.children) {
+                    child.render(ctx);
+                }
+            }
+            
+            contains(x, y) {
+                if (!super.contains(x, y)) return false;
+                
+                // Verificar se algum filho contém o ponto
+                for (const child of this.children) {
+                    if (child.contains(x, y)) {
+                        return true;
+                    }
+                }
+                
+                return true;
+            }
+        }
+        
+        // Sistema para gerenciar componentes e eventos
+        class UISystem {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.components = [];
+                this.hoverComponent = null;
+                this.activeComponent = null;
+                
+                // Configurar handlers de eventos
+                this.setupEvents();
+            }
+            
+            addComponent(component) {
+                this.components.push(component);
+                return component;
+            }
+            
+            setupEvents() {
+                this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
+                this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
+                this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+                this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this));
+                this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this));
+                this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this));
+            }
+            
+            // Converter coordenadas de toque para coordenadas do canvas
+            getTouchPos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const touch = e.touches[0] || e.changedTouches[0];
+                return {
+                    x: touch.clientX - rect.left,
+                    y: touch.clientY - rect.top
+                };
+            }
+            
+            handleTouchStart(e) {
+                e.preventDefault();
+                const pos = this.getTouchPos(e);
+                this.handleMouseDown({clientX: pos.x, clientY: pos.y});
+            }
+            
+            handleTouchEnd(e) {
+                e.preventDefault();
+                const pos = this.getTouchPos(e);
+                this.handleMouseUp({clientX: pos.x, clientY: pos.y});
+            }
+            
+            handleTouchMove(e) {
+                e.preventDefault();
+                const pos = this.getTouchPos(e);
+                this.handleMouseMove({clientX: pos.x, clientY: pos.y});
+            }
+            
+            handleMouseMove(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                let found = false;
+                
+                // Resetar estado hover dos botões
+                for (const component of this.components) {
+                    if (component instanceof Button) {
+                        if (component.contains(x, y)) {
+                            component.hovered = true;
+                            found = true;
+                            this.hoverComponent = component;
+                        } else {
+                            component.hovered = false;
+                        }
+                    }
+                }
+                
+                if (!found) {
+                    this.hoverComponent = null;
+                }
+                
+                this.render();
+            }
+            
+            handleMouseDown(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                for (const component of this.components) {
+                    if (component instanceof Button && component.contains(x, y)) {
+                        component.pressed = true;
+                        this.activeComponent = component;
+                        break;
+                    }
+                }
+                
+                this.render();
+            }
+            
+            handleMouseUp(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                if (this.activeComponent && this.activeComponent instanceof Button) {
+                    if (this.activeComponent.contains(x, y) && this.activeComponent.onClick) {
+                        this.activeComponent.onClick();
+                    }
+                    this.activeComponent.pressed = false;
+                    this.activeComponent = null;
+                }
+                
+                this.render();
+            }
+            
+            render() {
+                // Limpar canvas
+                ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Renderizar todos os componentes
+                for (const component of this.components) {
+                    component.render(ctx);
+                }
+            }
+        }
+        
+        // Função de inicialização
+        function init() {
+            // Ajustar o tamanho do canvas
+            resizeCanvas();
+            
+            // Inicializar sistema UI
+            window.uiSystem = new UISystem(canvas);
+            
+            // Criar um layout vertical principal
+            window.mainLayout = new VerticalLayout(10, 10, canvas.width - 20, canvas.height - 20);
+            uiSystem.addComponent(window.mainLayout);
+            
+            // Criar um layout horizontal no topo (ocupando a primeira 15%, mínimo 50px, máximo 100px)
+            const topLayout = new HorizontalLayout(0, 0, 0, 0)
+                .setMinSize(0, 50)
+                .setMaxSize(Infinity, 100);
+            window.mainLayout.addChild(topLayout, 15);
+            
+            // Criar um layout horizontal embaixo (ocupando 85%)
+            const bottomLayout = new HorizontalLayout(0, 0, 0, 0);
+            window.mainLayout.addChild(bottomLayout, 85);
+            
+            // Adicionar botões ao layout superior
+            topLayout.addChild(new Button(0, 0, 0, 0, "Home", () => {
+                alert("Home selecionado!");
+            }), 20).setMinSize(80, 30);
+            
+            topLayout.addChild(new Button(0, 0, 0, 0, "Produtos", () => {
+                alert("Produtos selecionado!");
+            }), 20).setMinSize(100, 30);
+            
+            topLayout.addChild(new Button(0, 0, 0, 0, "Serviços", () => {
+                alert("Serviços selecionado!");
+            }), 20).setMinSize(100, 30);
+            
+            topLayout.addChild(new Button(0, 0, 0, 0, "Contato", () => {
+                alert("Contato selecionado!");
+            }), 20).setMinSize(80, 30);
+            
+            topLayout.addChild(new Button(0, 0, 0, 0, "Sobre", () => {
+                alert("Sobre selecionado!");
+            }), 20).setMinSize(80, 30);
+            
+            // Adicionar um layout vertical à esquerda (ocupando 20% do layout inferior, largura mínima 150px)
+            const leftLayout = new VerticalLayout(0, 0, 0, 0)
+                .setMinSize(150, 0)
+                .setMaxSize(250, Infinity);
+            bottomLayout.addChild(leftLayout, 20);
+            
+            // Adicionar um layout vertical à direita (ocupando 80% do layout inferior)
+            const rightLayout = new VerticalLayout(0, 0, 0, 0);
+            bottomLayout.addChild(rightLayout, 80);
+            
+            // Adicionar botões ao layout esquerdo
+            leftLayout.addChild(new Button(0, 0, 0, 0, "Dashboard", () => {
+                alert("Dashboard selecionado");
+            }), 20).setMinSize(0, 40);
+            
+            leftLayout.addChild(new Button(0, 0, 0, 0, "Relatórios", () => {
+                alert("Relatórios selecionado");
+            }), 20).setMinSize(0, 40);
+            
+            leftLayout.addChild(new Button(0, 0, 0, 0, "Configurações", () => {
+                alert("Configurações selecionado");
+            }), 20).setMinSize(0, 40);
+            
+            leftLayout.addChild(new Button(0, 0, 0, 0, "Usuários", () => {
+                alert("Usuários selecionado");
+            }), 20).setMinSize(0, 40);
+            
+            leftLayout.addChild(new Button(0, 0, 0, 0, "Ajuda", () => {
+                alert("Ajuda selecionada");
+            }), 20).setMinSize(0, 40);
+            
+            // Adicionar conteúdo ao layout direito
+            // (dividido em duas seções, uma com 80% e outra com 20%)
+            const contentTop = new VerticalLayout(0, 0, 0, 0);
+            rightLayout.addChild(contentTop, 80);
+            
+            // Área do botão inferior com altura mínima de 60px
+            const contentBottom = new HorizontalLayout(0, 0, 0, 0)
+                .setMinSize(0, 60)
+                .setMaxSize(Infinity, 100);
+            rightLayout.addChild(contentBottom, 20);
+            
+            // Botões na parte inferior direita
+            contentBottom.addChild(new Button(0, 0, 0, 0, "Salvar", () => {
+                alert("Alterações salvas");
+            }), 25).setMinSize(100, 40);
+            
+            contentBottom.addChild(new Button(0, 0, 0, 0, "Cancelar", () => {
+                alert("Operação cancelada");
+            }), 25).setMinSize(100, 40);
+            
+            contentBottom.addChild(new Button(0, 0, 0, 0, "Imprimir", () => {
+                alert("Enviando para impressão");
+            }), 25).setMinSize(100, 40);
+            
+            contentBottom.addChild(new Button(0, 0, 0, 0, "Exportar", () => {
+                alert("Exportando dados");
+            }), 25).setMinSize(100, 40);
+            
+            // Adicionar algum conteúdo à área principal
+            const centerArea = new VerticalLayout(0, 0, 0, 0);
+            contentTop.addChild(centerArea, 100);
+            
+            // Adicionar uma grade de botões à área central
+            for (let row = 0; row < 3; row++) {
+                const rowLayout = new HorizontalLayout(0, 0, 0, 0);
+                centerArea.addChild(rowLayout, 33.33);
+                
+                for (let col = 0; col < 4; col++) {
+                    const btn = new Button(0, 0, 0, 0, `Item ${row*4 + col + 1}`, () => {
+                        alert(`Item ${row*4 + col + 1} selecionado`);
+                    });
+                    
+                    // Definir tamanho mínimo mais específico para botões da grade
+                    btn.setMinSize(70, 40);
+                    
+                    // Definir tamanho máximo para evitar botões muito grandes
+                    btn.setMaxSize(200, 80);
+                    
+                    rowLayout.addChild(btn, 25);
+                }
+            }
+            
+            // Atualizar layout e renderizar
+            window.mainLayout.updateLayout();
+            window.uiSystem.render();
+        }
+        
+        // Evento de redimensionamento da janela
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Inicializar quando o documento estiver carregado
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

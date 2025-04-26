@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Layout System - Renderer + Size Limits</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { background: #222; display: block; }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+// --- Enums ---
+const AlignVertical = { Top: 0, Center: 1, Bottom: 2 };
+const AlignHorizontal = { Left: 0, Center: 1, Right: 2 };
+
+// --- Padding Class ---
+class Padding {
+    constructor(top = 0, bottom = 0, left = 0, right = 0) {
+        this.top = top; this.bottom = bottom;
+        this.left = left; this.right = right;
+    }
+    setAll(v) {
+        this.top = this.bottom = this.left = this.right = v;
+    }
+}
+
+// --- Renderer ---
+class Renderer {
+    constructor(ctx) {
+        this.ctx = ctx;
+    }
+    save() { this.ctx.save(); }
+    restore() { this.ctx.restore(); }
+    drawRect(x, y, w, h, color) {
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(x, y, w, h);
+    }
+    drawText(text, x, y, color, font = "16px Arial", align = "center") {
+        this.ctx.fillStyle = color;
+        this.ctx.font = font;
+        this.ctx.textAlign = align;
+        this.ctx.textBaseline = "middle";
+        this.ctx.fillText(text, x, y);
+    }
+    drawStrokeRect(x, y, w, h, color = "red") {
+        this.ctx.strokeStyle = color;
+        this.ctx.strokeRect(x, y, w, h);
+    }
+}
+
+// --- Widget Base ---
+class Widget {
+    constructor() {
+        this.x = 0; this.y = 0; this.width = 0; this.height = 0;
+        this.minWidth = 0; this.minHeight = 0;
+        this.maxWidth = Infinity; this.maxHeight = Infinity;
+        this.alignVertical = AlignVertical.Top;
+        this.alignHorizontal = AlignHorizontal.Left;
+        this.expandWidth = true;
+        this.expandHeight = true;
+        this.padding = new Padding();
+        this.percent = 0;
+        this.parent = null;
+    }
+
+    clampSize() {
+        this.width = Math.max(this.minWidth, Math.min(this.width, this.maxWidth));
+        this.height = Math.max(this.minHeight, Math.min(this.height, this.maxHeight));
+    }
+
+    updateLayout() {}
+    update(dt) {}
+    render(renderer) {}
+    debugDraw(renderer) {
+        renderer.drawStrokeRect(this.x, this.y, this.width, this.height, "red");
+    }
+}
+
+// --- Layout Base ---
+class Layout extends Widget {
+    constructor() {
+        super();
+        this.children = [];
+    }
+    addChild(widget, percent = 0) {
+        widget.parent = this;
+        widget.percent = percent;
+        this.children.push(widget);
+    }
+    removeChild(widget) {
+        const idx = this.children.indexOf(widget);
+        if (idx !== -1) {
+            this.children.splice(idx, 1);
+            widget.parent = null;
+        }
+    }
+    clearChildren() {
+        for (let child of this.children) child.parent = null;
+        this.children = [];
+    }
+    updateLayout() {
+        for (let child of this.children) {
+            child.updateLayout();
+        }
+    }
+    render(renderer) {
+        for (let child of this.children) {
+            child.render(renderer);
+        }
+    }
+    debugDraw(renderer) {
+        super.debugDraw(renderer);
+        for (let child of this.children) {
+            child.debugDraw(renderer);
+        }
+    }
+}
+
+// --- LayoutVertical ---
+class LayoutVertical extends Layout {
+    constructor() {
+        super();
+        this.spacing = 0;
+    }
+    updateLayout() {
+        let totalPercent = 0;
+        for (let widget of this.children) totalPercent += widget.percent;
+        if (totalPercent !== 100) {
+            for (let widget of this.children) {
+                widget.percent = (widget.percent / totalPercent) * 100;
+            }
+        }
+
+        let totalHeight = this.height - this.padding.top - this.padding.bottom - (this.children.length - 1) * this.spacing;
+        let offsetY = this.y + this.padding.top;
+        let x = this.x + this.padding.left;
+        let width = this.width - this.padding.left - this.padding.right;
+
+        for (let widget of this.children) {
+            widget.x = x;
+            widget.y = offsetY;
+            widget.width = width;
+            widget.height = totalHeight * (widget.percent / 100);
+            widget.clampSize();
+            offsetY += widget.height + this.spacing;
+            widget.updateLayout();
+        }
+    }
+}
+
+// --- LayoutAlign ---
+class LayoutAlign extends Layout {
+    constructor() {
+        super();
+    }
+    updateLayout() {
+        let availableWidth = this.width - this.padding.left - this.padding.right;
+        let availableHeight = this.height - this.padding.top - this.padding.bottom;
+
+        for (let widget of this.children) {
+            widget.width = widget.expandWidth ? availableWidth : (widget.fixedWidth || 100);
+            widget.height = widget.expandHeight ? availableHeight : (widget.fixedHeight || 40);
+            widget.clampSize();
+
+            if (widget.alignHorizontal === AlignHorizontal.Left) {
+                widget.x = this.x + this.padding.left;
+            } else if (widget.alignHorizontal === AlignHorizontal.Center) {
+                widget.x = this.x + this.padding.left + (availableWidth - widget.width) / 2;
+            } else if (widget.alignHorizontal === AlignHorizontal.Right) {
+                widget.x = this.x + this.width - this.padding.right - widget.width;
+            }
+
+            if (widget.alignVertical === AlignVertical.Top) {
+                widget.y = this.y + this.padding.top;
+            } else if (widget.alignVertical === AlignVertical.Center) {
+                widget.y = this.y + this.padding.top + (availableHeight - widget.height) / 2;
+            } else if (widget.alignVertical === AlignVertical.Bottom) {
+                widget.y = this.y + this.height - this.padding.bottom - widget.height;
+            }
+
+            widget.updateLayout();
+        }
+    }
+}
+
+// --- Button Widget ---
+class Button extends Widget {
+    constructor(text, color = "blue") {
+        super();
+        this.text = text;
+        this.color = color;
+        this.fixedWidth = 200;
+        this.fixedHeight = 40;
+    }
+    render(renderer) {
+        renderer.drawRect(this.x, this.y, this.width, this.height, this.color);
+        renderer.drawText(this.text, this.x + this.width/2, this.y + this.height/2, "white");
+    }
+}
+
+// --- Setup ---
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const renderer = new Renderer(ctx);
+
+// Root LayoutVertical
+const rootLayout = new LayoutVertical();
+rootLayout.spacing = 10;
+rootLayout.padding.setAll(10);
+
+// TopBar
+const topBar = new Button("Top Bar", "#3366cc");
+
+// Body LayoutAlign
+const bodyLayout = new LayoutAlign();
+bodyLayout.padding.setAll(10);
+
+// Button no centro com limites de tamanho
+const buttonCenter = new Button("Center Button", "#33cc66");
+buttonCenter.alignHorizontal = AlignHorizontal.Center;
+buttonCenter.alignVertical = AlignVertical.Center;
+buttonCenter.expandWidth = true;
+buttonCenter.expandHeight = false;
+buttonCenter.minWidth = 100;
+buttonCenter.maxWidth = 300;
+buttonCenter.minHeight = 40;
+buttonCenter.maxHeight = 80;
+
+bodyLayout.addChild(buttonCenter);
+
+// BottomBar
+const bottomBar = new Button("Bottom Bar", "#3366cc");
+
+// Montar o root
+rootLayout.addChild(topBar, 10);
+rootLayout.addChild(bodyLayout, 80);
+rootLayout.addChild(bottomBar, 10);
+
+// Resize
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    rootLayout.x = 0;
+    rootLayout.y = 0;
+    rootLayout.width = canvas.width;
+    rootLayout.height = canvas.height;
+}
+
+// Loop
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rootLayout.updateLayout();
+    rootLayout.render(renderer);
+    rootLayout.debugDraw(renderer);
+    requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

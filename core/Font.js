@@ -1,11 +1,20 @@
 export class Font {
-    constructor(size = 12, family = "Arial", color = "#ffffff") {
+    constructor(size = 14, family = "Arial", color = "#ffffff") {
         this.size = size;
         this.family = family;
         this.color = color;
 
+         this.align = "left";
+         this.baseline = "top";
+    }
+
+    reset()
+    {
         this.align = "left";
         this.baseline = "top";
+        
+      //  ctx.textAlign = 'center';
+      //  ctx.textBaseline = 'middle';
     }
 
     apply(ctx) {

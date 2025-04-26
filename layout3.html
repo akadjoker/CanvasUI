@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Widget e Layout Adaptativo com Canvas</title>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Classe base para widgets
+        class Widget {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+            }
+
+            update() {}
+            render(ctx) {}
+            containsPoint(px, py) {
+                return px >= this.x && px <= this.x + this.width &&
+                       py >= this.y && py <= this.y + this.height;
+            }
+        }
+
+        // Widget Button
+        class Button extends Widget {
+            constructor(x, y, width, height, label, onClick) {
+                super(x, y, width, height);
+                this.label = label;
+                this.onClick = onClick;
+            }
+
+            render(ctx) {
+                ctx.fillStyle = '#4CAF50';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.strokeStyle = '#000';
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = '#FFF';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.label, this.x + this.width / 2, this.y + this.height / 2);
+            }
+
+            handleClick() {
+                if (this.onClick) this.onClick();
+            }
+        }
+
+        // Classe para um layout
+        class Layout {
+            constructor(x, y, width, height, orientation) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.orientation = orientation; // 'horizontal' ou 'vertical'
+                this.widgets = [];
+            }
+
+            addWidget(widget) {
+                this.widgets.push(widget);
+            }
+
+            layoutWidgets() {
+                const widgetCount = this.widgets.length;
+                if (widgetCount === 0) return;
+
+                if (this.orientation === 'horizontal') {
+                    const widgetWidth = this.width / widgetCount;
+                    this.widgets.forEach((widget, i) => {
+                        widget.x = this.x + i * widgetWidth;
+                        widget.y = this.y;
+                        widget.width = widgetWidth;
+                        widget.height = this.height;
+                    });
+                } else {
+                    const widgetHeight = this.height / widgetCount;
+                    this.widgets.forEach((widget, i) => {
+                        widget.x = this.x;
+                        widget.y = this.y + i * widgetHeight;
+                        widget.width = this.width;
+                        widget.height = widgetHeight;
+                    });
+                }
+            }
+
+            render(ctx) {
+                this.widgets.forEach(widget => widget.render(ctx));
+            }
+
+            handleClick(px, py) {
+                this.widgets.forEach(widget => {
+                    if (widget.containsPoint(px, py)) {
+                        if (widget instanceof Button) widget.handleClick();
+                    }
+                });
+            }
+        }
+
+        // Controlador de layouts
+        class LayoutController {
+            constructor(canvasWidth, canvasHeight) {
+                this.width = canvasWidth;
+                this.height = canvasHeight;
+                this.layouts = [];
+            }
+
+            addLayout(orientation, heightPercent, yOffsetPercent = 0) {
+                const y = this.height * (yOffsetPercent / 100);
+                const height = this.height * (heightPercent / 100);
+                const layout = new Layout(0, y, this.width, height, orientation);
+                this.layouts.push(layout);
+                return layout;
+            }
+
+            layoutAll() {
+                this.layouts.forEach(layout => {
+                    layout.layoutWidgets();
+                });
+            }
+
+            render(ctx) {
+                ctx.clearRect(0, 0, this.width, this.height);
+                this.layouts.forEach(layout => layout.render(ctx));
+            }
+
+            handleClick(px, py) {
+                this.layouts.forEach(layout => layout.handleClick(px, py));
+            }
+        }
+
+        // Configuração do layout adaptativo
+        const controller = new LayoutController(canvas.width, canvas.height);
+
+        // Layout do topo (100% largura, 20% altura)
+        const topLayout = controller.addLayout('horizontal', 20, 0);
+        topLayout.addWidget(new Button(0, 0, 0, 0, 'Botão Topo 1', () => alert('Botão Topo 1 clicado')));
+        topLayout.addWidget(new Button(0, 0, 0, 0, 'Botão Topo 2', () => alert('Botão Topo 2 clicado')));
+
+        // Layouts verticais (cada um com 20% da altura, dividindo o espaço restante)
+        const verticalLayout1 = controller.addLayout('vertical', 20, 20);
+        verticalLayout1.addWidget(new Button(0, 0, 0, 0, 'Botão 1', () => alert('Botão 1 clicado')));
+
+        const verticalLayout2 = controller.addLayout('vertical', 20, 40);
+        verticalLayout2.addWidget(new Button(0, 0, 0, 0, 'Botão 2', () => alert('Botão 2 clicado')));
+
+        const verticalLayout3 = controller.addLayout('vertical', 20, 60);
+        verticalLayout3.addWidget(new Button(0, 0, 0, 0, 'Botão 3', () => alert('Botão 3 clicado')));
+
+        // Organizar todos os layouts
+        controller.layoutAll();
+
+        // Renderizar
+        controller.render(ctx);
+
+        // Evento de clique
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const px = e.clientX - rect.left;
+            const py = e.clientY - rect.top;
+            controller.handleClick(px, py);
+        });
+
+        // Ajustar ao redimensionar a janela
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            controller.width = canvas.width;
+            controller.height = canvas.height;
+            controller.layoutAll();
+            controller.render(ctx);
+        });
+    </script>
+</body>
+</html>

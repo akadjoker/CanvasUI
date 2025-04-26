@@ -3,7 +3,27 @@ import { Font } from "./Font.js";
 export class Graphics {
     constructor(ctx) {
         this.ctx = ctx;
-        this.currentFont = new Font(); // valor por defeito
+        this.currentFont = null; // valor por defeito
+        this.setFont(new Font());
+
+        
+        this.save_font = 'bold 16px Arial';
+        this.save_textAlign = 'center';
+        this.save_textBaseline = 'top';
+    }
+
+    saveFont()
+    {
+        this.save_font = this.ctx.font;
+        this.save_textAlign = this.ctx.textAlign;
+        this.save_textBaseline = this.ctx.textBaseline;
+    }
+
+    restoreFont()
+    {
+        this.ctx.font = this.save_font;
+        this.ctx.textAlign = this.save_textAlign;
+        this.ctx.textBaseline = this.save_textBaseline;
     }
 
     save() { this.ctx.save(); }
@@ -22,6 +42,12 @@ export class Graphics {
 
     setFont(font) {
         this.currentFont = font;
+        font.apply(this.ctx);
+    }
+
+    resetFont()
+    {
+        this.currentFont.reset();
         font.apply(this.ctx);
     }
 

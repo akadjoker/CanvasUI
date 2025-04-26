@@ -1,9 +1,9 @@
 
-import { Activity } from './core/Activity.js';
-import { Graphics } from './core/Graphics.js';
-import { Theme,Button ,Slider,ListBox,ProgressBar,Knob, ComboBox,Checkbox,RadioGroup,RadioButton,CheckboxGroup,ToggleButton, Panel,TabView,Window,DragValueField, Label} from './core/Widget.js';
-import { VerticalLayout } from './core/Layout.js';
-import { FadeInTransition, FadeOutTransition, Fragment,Navigator,SlideLeftTransition,SlideRightTransition } from './core/Fragment.js';
+import { Activity } from './Activity.js';
+import { Graphics } from './Graphics.js';
+import { Theme,Button ,Slider,ListBox,ProgressBar,Knob, ComboBox,Checkbox,RadioGroup,RadioButton,CheckboxGroup,ToggleButton, Panel,TabView,Window,DragValueField, Label} from './Widget.js';
+import { VerticalLayout } from './Layout.js';
+import { FadeInTransition, FadeOutTransition, Fragment,Navigator,SlideLeftTransition,SlideRightTransition } from './Fragment.js';
 import { MainFragment,SecondFragment } from './fragments/MyAppFragment.js';
 
 

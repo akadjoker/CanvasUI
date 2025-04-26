@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Layout System - Vertical + Align</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { background: #222; display: block; }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+// --- Base Classes ---
+class Widget {
+    constructor() {
+        this.x = 0; this.y = 0; this.width = 0; this.height = 0;
+    }
+    update(dt) {}
+    render(ctx) {}
+    updateLayout() {}
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+class Button extends Widget {
+    constructor(text, color = "blue") {
+        super();
+        this.text = text;
+        this.color = color;
+        this.fixedWidth = 200;
+        this.fixedHeight = 40;
+    }
+    render(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        ctx.fillStyle = "white";
+        ctx.font = "16px Arial";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        ctx.fillText(this.text, this.x + this.width/2, this.y + this.height/2);
+    }
+}
+
+// --- LayoutVertical ---
+class LayoutVertical extends Widget {
+    constructor() {
+        super();
+        this.children = [];
+        this.spacing = 0;
+        this.padding = { top: 0, bottom: 0, left: 0, right: 0 };
+    }
+    addChild(percent, widget) {
+        this.children.push({ percent, widget });
+    }
+    updateLayout() {
+        let totalPercent = this.children.reduce((sum, c) => sum + c.percent, 0);
+        if (totalPercent !== 100) {
+            for (let child of this.children) {
+                child.percent = (child.percent / totalPercent) * 100;
+            }
+        }
+
+        let totalHeight = this.height - this.padding.top - this.padding.bottom - (this.children.length - 1) * this.spacing;
+        let offsetY = this.y + this.padding.top;
+        let x = this.x + this.padding.left;
+        let width = this.width - this.padding.left - this.padding.right;
+
+        for (let child of this.children) {
+            child.widget.x = x;
+            child.widget.y = offsetY;
+            child.widget.width = width;
+            child.widget.height = totalHeight * (child.percent / 100);
+
+            offsetY += child.widget.height + this.spacing;
+
+       
+                child.widget.updateLayout();
+        
+        }
+    }
+    render(ctx) {
+        for (let child of this.children) {
+            child.widget.render(ctx);
+        }
+    }
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+        for (let child of this.children) {
+            child.widget.debugDraw(ctx);
+        }
+    }
+}
+class LayoutHorizontal extends Widget {
+    constructor() {
+        super();
+        this.children = [];
+        this.spacing = 0;
+        this.padding = { top: 0, bottom: 0, left: 0, right: 0 };
+    }
+
+    addChild(percent, widget) {
+        this.children.push({ percent, widget });
+    }
+
+    updateLayout() {
+        let totalPercent = this.children.reduce((sum, c) => sum + c.percent, 0);
+        if (totalPercent !== 100) {
+            for (let child of this.children) {
+                child.percent = (child.percent / totalPercent) * 100;
+            }
+        }
+
+        let totalWidth = this.width - this.padding.left - this.padding.right - (this.children.length - 1) * this.spacing;
+        let offsetX = this.x + this.padding.left;
+        let y = this.y + this.padding.top;
+        let height = this.height - this.padding.top - this.padding.bottom;
+
+        for (let child of this.children) {
+            child.widget.x = offsetX;
+            child.widget.y = y;
+            child.widget.width = totalWidth * (child.percent / 100);
+            child.widget.height = height;
+
+            offsetX += child.widget.width + this.spacing;
+
+            if (typeof child.widget.updateLayout === "function") {
+                child.widget.updateLayout();
+            }
+        }
+    }
+
+    render(ctx) {
+        for (let child of this.children) {
+            child.widget.render(ctx);
+        }
+    }
+
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+        for (let child of this.children) {
+            child.widget.debugDraw(ctx);
+        }
+    }
+}
+ 
+// --- LayoutAlign ---
+class LayoutAlign extends Widget {
+    constructor() {
+        super();
+        this.children = [];
+        this.padding = { top: 0, bottom: 0, left: 0, right: 0 };
+    }
+    addChild(widget, options = {}) {
+        widget.alignVertical = options.alignVertical || "top";
+        widget.alignHorizontal = options.alignHorizontal || "left";
+        widget.expandWidth = options.expandWidth ?? true;
+        widget.expandHeight = options.expandHeight ?? false;
+        this.children.push(widget);
+    }
+    updateLayout() {
+        let availableWidth = this.width - this.padding.left - this.padding.right;
+        let availableHeight = this.height - this.padding.top - this.padding.bottom;
+
+        for (let widget of this.children) 
+        {
+            // Tamanho
+            widget.width = widget.expandWidth ? availableWidth : widget.fixedWidth;
+            widget.height = widget.expandHeight ? availableHeight : widget.fixedHeight;
+
+            // Horizontal
+            if (widget.alignHorizontal === "left") {
+                widget.x = this.x + this.padding.left;
+            } else if (widget.alignHorizontal === "center") {
+                widget.x = this.x + this.padding.left + (availableWidth - widget.width) / 2;
+            } else if (widget.alignHorizontal === "right") {
+                widget.x = this.x + this.width - this.padding.right - widget.width;
+            }
+
+            // Vertical
+            if (widget.alignVertical === "top") {
+                widget.y = this.y + this.padding.top;
+            } else if (widget.alignVertical === "center") {
+                widget.y = this.y + this.padding.top + (availableHeight - widget.height) / 2;
+            } else if (widget.alignVertical === "bottom") {
+                widget.y = this.y + this.height - this.padding.bottom - widget.height;
+            }
+
+       
+                widget.updateLayout();
+            
+        }
+    }
+    render(ctx) {
+        for (let child of this.children) {
+            child.render(ctx);
+        }
+    }
+    debugDraw(ctx) {
+        ctx.save();
+        ctx.strokeStyle = "green";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+        for (let child of this.children) {
+            child.debugDraw(ctx);
+        }
+    }
+}
+
+// --- Setup ---
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// Root layout
+const rootLayout = new LayoutVertical();
+rootLayout.spacing = 10;
+
+rootLayout.padding = { top: 10, bottom: 10, left: 10, right: 10 };
+
+// TopBar simples
+const topBar = new Button("Top Bar", "#3366cc");
+
+// Body com LayoutAlign
+const bodyLayout = new LayoutAlign();
+bodyLayout.padding = { top: 10, bottom: 10, left: 10, right: 10 };
+
+// Botões dentro do Body
+bodyLayout.addChild(new Button("Button Top", "#3399ff"), { alignVertical: "top", alignHorizontal: "center", expandWidth: true, expandHeight: false });
+
+const centerLayout = new LayoutHorizontal();
+centerLayout.spacing = 10;
+centerLayout.fixedHeight = 30;
+centerLayout.fixedWidth = 100*6;
+
+
+centerLayout.addChild(20,new Button("a", "#6699ff"));
+centerLayout.addChild(20,new Button("b", "#6699ff"));
+centerLayout.addChild(30,new Button("a", "#6699ff"));
+centerLayout.addChild(30,new Button("b", "#6699ff"));
+centerLayout.addChild(20,new Button("a", "#6699ff"));
+centerLayout.addChild(20,new Button("b", "#6699ff"));
+
+
+bodyLayout.addChild(centerLayout, { alignVertical: "center", alignHorizontal: "center", expandWidth: true, expandHeight: false });
+
+
+
+//bodyLayout.addChild(new Button("Button Center", "#33cc66"), { alignVertical: "center", alignHorizontal: "center", expandWidth: true, expandHeight: false });
+
+
+
+bodyLayout.addChild(new Button("Button Bottom", "#cc3366"), { alignVertical: "bottom", alignHorizontal: "center", expandWidth: true, expandHeight: false });
+
+// BottomBar simples
+const bottomBar = new Button("Bottom Bar", "#3366cc");
+
+// Montar o root
+rootLayout.addChild(10, topBar);
+rootLayout.addChild(80, bodyLayout);
+rootLayout.addChild(10, bottomBar);
+
+resizeCanvas();
+
+// Loop
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rootLayout.updateLayout();
+    rootLayout.render(ctx);
+    rootLayout.debugDraw(ctx);
+    requestAnimationFrame(loop);
+}
+loop();
+
+// Resize
+window.addEventListener('resize', resizeCanvas);
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    rootLayout.x = 0;
+    rootLayout.y = 0;
+    rootLayout.width = canvas.width;
+    rootLayout.height = canvas.height;
+}
+</script>
+</body>
+</html>

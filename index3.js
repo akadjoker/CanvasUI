@@ -1,11 +1,9 @@
 
 import { Activity } from './core/Activity.js';
 import { Graphics } from './core/Graphics.js';
-import { Theme,Button ,TextView,SliderCircular,Slider,ListBox,ProgressBar,Knob, ComboBox,Checkbox,RadioGroup,RadioButton,CheckboxGroup,ToggleButton, Panel,TabView,Window,DragValueField, Label} from './core/Widget.js';
+import { Theme,Button ,Stepper,TextView,SliderCircular,Slider,ListBox,ProgressBar,Knob, ComboBox,Checkbox,RadioGroup,RadioButton,CheckboxGroup,ToggleButton, Panel,TabView,Window,DragValueField, Label} from './core/Widget.js';
 import { HorizontalLayout, VerticalLayout,Layout } from './core/Layout.js';
 import { FadeInTransition, FadeOutTransition, Fragment,Navigator,SlideLeftTransition,SlideRightTransition } from './core/Fragment.js';
-import { MainFragment,SecondFragment } from './fragments/MyAppFragment.js';
-
 
 class MenuFragment extends Fragment
 {
@@ -122,6 +120,13 @@ class MenuFragment extends Fragment
 
             layout.add(progress);
             layout.add(slider);
+
+            const stepper = new Stepper(0, 100, 1, 5, (val) => {
+                console.log("Novo valor:", val);
+            });
+            stepper.setHeightPercent(0.05);
+
+            layout.add(stepper);
            
             const combo = new ComboBox(["Banana", "Laranja", "Uva", "Melão", "Kiwi", "Pera", "Manga"]);
             combo.setHeightPercent(0.5);

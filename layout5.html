@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Layout Controller Canvas</title>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <script>
+class Widget {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.width = 0;
+        this.height = 0;
+    }
+    update(dt) {}
+    render(ctx) {}
+}
+
+class LayoutSlot {
+    constructor(align, sizePercent, child) {
+        this.align = align;
+        this.sizePercent = sizePercent;
+        this.child = child; // pode ser um Widget ou outro LayoutController
+    }
+}
+
+class LayoutController extends Widget {
+    constructor() {
+        super();
+        this.slots = [];
+    }
+
+    addSlot(align, sizePercent, child) {
+        this.slots.push(new LayoutSlot(align, sizePercent, child));
+    }
+
+    updateLayout() {
+    let offsetTop = 0, offsetBottom = 0, offsetLeft = 0, offsetRight = 0;
+    let totalVerticalPercent = 0;
+    let totalHorizontalPercent = 0;
+
+    for (let slot of this.slots) {
+        if (!slot.child) continue;
+        if (slot.align === "top" || slot.align === "bottom") {
+            totalVerticalPercent += slot.sizePercent;
+        }
+        else if (slot.align === "left" || slot.align === "right") {
+            totalHorizontalPercent += slot.sizePercent;
+        }
+    }
+
+    // Se ultrapassar 100%, normaliza
+    if (totalVerticalPercent > 100) {
+        for (let slot of this.slots) {
+            if (slot.align === "top" || slot.align === "bottom") {
+                slot.sizePercent = slot.sizePercent * 100 / totalVerticalPercent;
+            }
+        }
+    }
+
+    if (totalHorizontalPercent > 100) {
+        for (let slot of this.slots) {
+            if (slot.align === "left" || slot.align === "right") {
+                slot.sizePercent = slot.sizePercent * 100 / totalHorizontalPercent;
+            }
+        }
+    }
+
+    // Layout normal
+    for (let slot of this.slots) {
+        if (!slot.child) continue;
+
+        if (slot.align === "top") {
+            slot.child.x = this.x + offsetLeft;
+            slot.child.y = this.y + offsetTop;
+            slot.child.width = this.width - offsetLeft - offsetRight;
+            slot.child.height = this.height * (slot.sizePercent / 100);
+            offsetTop += slot.child.height;
+        }
+        else if (slot.align === "bottom") {
+            slot.child.x = this.x + offsetLeft;
+            slot.child.y = this.y + this.height - offsetBottom - (this.height * (slot.sizePercent / 100));
+            slot.child.width = this.width - offsetLeft - offsetRight;
+            slot.child.height = this.height * (slot.sizePercent / 100);
+            offsetBottom += slot.child.height;
+        }
+        else if (slot.align === "left") {
+            slot.child.x = this.x + offsetLeft;
+            slot.child.y = this.y + offsetTop;
+            slot.child.width = this.width * (slot.sizePercent / 100);
+            slot.child.height = this.height - offsetTop - offsetBottom;
+            offsetLeft += slot.child.width;
+        }
+        else if (slot.align === "right") {
+            slot.child.x = this.x + this.width - offsetRight - (this.width * (slot.sizePercent / 100));
+            slot.child.y = this.y + offsetTop;
+            slot.child.width = this.width * (slot.sizePercent / 100);
+            slot.child.height = this.height - offsetTop - offsetBottom;
+            offsetRight += slot.child.width;
+        }
+
+        if (slot.child instanceof LayoutController) {
+            slot.child.updateLayout();
+        }
+    }
+}
+
+
+    render(ctx) {
+        for (let slot of this.slots) {
+            if (slot.child) {
+                slot.child.render(ctx);
+            }
+        }
+    }
+}
+
+class Button extends Widget {
+    constructor(text) {
+        super();
+        this.text = text;
+    }
+
+    render(ctx) {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.fillStyle = "white";
+        ctx.font = "20px Arial";
+        ctx.fillText(this.text, this.x + 10, this.y + this.height/2 + 5);
+    }
+}
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const rootLayout = new LayoutController();
+rootLayout.x = 0;
+rootLayout.y = 0;
+rootLayout.width = canvas.width;
+rootLayout.height = canvas.height;
+
+// Layout do topo
+const topLayout = new LayoutController();
+rootLayout.addSlot("top", 20, topLayout);
+
+// Layout do centro
+const centerButton = new Button("Main Area");
+rootLayout.addSlot("top", 80, centerButton);
+
+// Dentro do top layout, adicionamos 2 botões
+topLayout.addSlot("left", 50, new Button("Menu"));
+topLayout.addSlot("right", 50, new Button("Title"));
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rootLayout.updateLayout();
+    rootLayout.render(ctx);
+    requestAnimationFrame(loop);
+}
+
+loop();
+
+// Se redimensionar o ecrã
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    rootLayout.width = canvas.width;
+    rootLayout.height = canvas.height;
+});
+    </script>
+    
+</body>
+</html>

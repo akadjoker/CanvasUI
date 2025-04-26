@@ -3,7 +3,7 @@ import { Navigator } from "./Fragment.js";
 
 export class Activity
 {
-    constructor(canvas, virtualWidth = 550, virtualHeight = 800, fitMode = "none") 
+    constructor(canvas, virtualWidth = 800, virtualHeight = 900, fitMode = "fit") 
     {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
@@ -108,6 +108,7 @@ export class Activity
         this.pointX = x;
         this.pointY = y;
         this._handleMouse(Input.Mouse.DOWN, x, y, e.button);
+        console.log("down");
     }
 
     _onMouseUp(e) {
@@ -255,8 +256,8 @@ export class Activity
             this.g.fillCircle(this.pointX, this.pointY, 4);
             this.ctx.restore();
 
-            this.g.setColor("#00ff00");
-            this.g.drawText(`FPS: ${this.fps}`, 10, this.height - 16, 14);
+            this.g.setColor("#rgb(45,45,45");
+            this.g.drawText(`FPS: ${this.fps} (${this.width}/${this.height}) `, 10, this.height - 16, 14);
 
             
             Input.update();

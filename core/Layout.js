@@ -121,14 +121,6 @@ export class Layout extends Widget
             }
         }
 
-        // for (let i = this.children.length - 1; i >= 0; i--)
-        // {
-        //     if (i !== ignore)
-        //     {
-        //         const child = this.children[i];
-        //         child.handleMouseOut(x, y);
-        //     }
-        // }
 
         return false;
     }

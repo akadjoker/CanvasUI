@@ -1,10 +1,736 @@
 
-import { Layout } from "./Layout.js";
-import { Rectangle } from "./Utils.js";
-import {Input} from "./Input.js";
-import { Tween } from "./Tween.js";
 
-export class Margin
+ class Rectangle
+{
+  constructor(x = 0, y = 0, width = 0, height = 0)
+  {
+    this.set(x, y, width, height);
+  }
+
+  set(x, y, width, height) {
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+  }
+
+  contains(px, py) {
+    return (
+      px >= this.x &&
+      py >= this.y &&
+      px <= this.x + this.width &&
+      py <= this.y + this.height
+    );
+  }
+
+  isEmpty() {
+    return this.width === 0 || this.height === 0;
+  }
+
+  clone() {
+    return new Rectangle(this.x, this.y, this.width, this.height);
+  }
+  transform(matrix) {
+    const points = [
+      matrix.transformPoint(this.x, this.y),
+      matrix.transformPoint(this.x + this.width, this.y),
+      matrix.transformPoint(this.x, this.y + this.height),
+      matrix.transformPoint(this.x + this.width, this.y + this.height)
+    ];
+  
+    const xs = points.map(p => p[0]);
+    const ys = points.map(p => p[1]);
+  
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+  
+    return new Rectangle(minX, minY, maxX - minX, maxY - minY);
+  }
+  
+}
+
+
+ class MatrixStack {
+  constructor() {
+    this.stack = [MatrixStack.identity()];
+  }
+
+  static identity() {
+    return [1, 0, 0, 1, 0, 0];
+  }
+
+  get current() {
+    return this.stack[this.stack.length - 1];
+  }
+
+  push() {
+    this.stack.push(this.current.slice());
+  }
+
+  pop() {
+    this.stack.pop();
+  }
+
+  translate(x, y) {
+    const m = this.current;
+    m[4] += x * m[0] + y * m[2];
+    m[5] += x * m[1] + y * m[3];
+  }
+
+  applyToGraphics(g) {
+    const m = this.current;
+    g.setTransform(...m);
+  }
+
+  scale(sx, sy = sx) {
+    const m = this.current;
+    m[0] *= sx;
+    m[1] *= sx;
+    m[2] *= sy;
+    m[3] *= sy;
+  }
+
+
+  transformPointInverse(x, y) {
+    const [a, b, c, d, e, f] = this.current;
+    const det = a * d - b * c;
+    if (det === 0) return [0, 0];
+    const ia = d / det;
+    const ib = -b / det;
+    const ic = -c / det;
+    const id = a / det;
+    const ie = (c * f - d * e) / det;
+    const iff = (b * e - a * f) / det;
+    return [
+      ia * x + ic * y + ie,
+      ib * x + id * y + iff
+    ];
+  }
+  rotate(angle) {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    const m = this.current;
+
+    const a = m[0] * cos + m[2] * sin;
+    const b = m[1] * cos + m[3] * sin;
+    const c = m[0] * -sin + m[2] * cos;
+    const d = m[1] * -sin + m[3] * cos;
+
+    m[0] = a;
+    m[1] = b;
+    m[2] = c;
+    m[3] = d;
+  }
+
+  transformPoint(x, y) {
+    const [a, b, c, d, e, f] = this.current;
+    return [
+      a * x + c * y + e,
+      b * x + d * y + f
+    ];
+  }
+
+}
+
+
+ class Input {
+    static Mouse = {
+        DOWN: 0,
+        UP: 1,
+        MOVE: 2
+    };
+
+    static Button = {
+        LEFT: 0,
+        MIDDLE: 1,
+        RIGHT: 2
+    };
+
+    static Key = {
+        DOWN: 0,
+        UP: 1,
+        PRESS: 2
+    };
+
+    static keys = new Set();
+    static mouseButtons = new Set();
+    static mouseX = 0;
+    static mouseY = 0;
+    static mouseDX = 0;
+    static mouseDY = 0;
+
+    static prevX = 0;
+    static prevY = 0;
+
+
+    static MAX_KEYBOARD_KEYS = 256;
+    static previousKeyState = [Input.MAX_KEYBOARD_KEYS];
+    static currentKeyState = [Input.MAX_KEYBOARD_KEYS];
+
+    static MAX_TOUCH_POINTS = 10;
+
+    static currentButtonState = [Input.MAX_TOUCH_POINTS];
+    static previousButtonState = [Input.MAX_TOUCH_POINTS];
+
+
+
+    static init() {
+        for (let i = 0; i < Input.MAX_TOUCH_POINTS; i++) {
+            Input.currentButtonState[i] = 0;
+            Input.previousButtonState[i] = 0;
+        }
+        for (let i = 0; i < Input.MAX_KEYBOARD_KEYS; i++) {
+            Input.currentKeyState[i] = 0;
+            Input.previousKeyState[i] = 0;
+        }
+    }
+
+    static onKeyDown(code) {
+        Input.keys.add(code);
+
+    }
+
+    static onKeyUp(code) {
+        Input.keys.delete(code);
+    }
+
+    static onMouseDown(button) {
+        Input.mouseButtons.add(button);
+        Input.currentButtonState[button] = 1;
+    }
+
+    static onMouseUp(button) {
+        Input.mouseButtons.delete(button);
+        Input.currentButtonState[button] = 0;
+    }
+
+    static onMouseMove(x, y) {
+        Input.mouseX = x;
+        Input.mouseY = y;
+        Input.mouseDX = x - Input.prevX;
+        Input.mouseDY = y - Input.prevY;
+
+        Input.mouseX = x;
+        Input.mouseY = y;
+
+        Input.prevX = x;
+        Input.prevY = y;
+    }
+
+    static isKeyDown(code) {
+        return Input.keys.has(code);
+    }
+
+    static isMouseDown(button) {
+        return Input.mouseButtons.has(button);
+    }
+
+    static getMousePosition() {
+        return { x: Input.mouseX, y: Input.mouseY };
+    }
+    static isMouseDown(button) {
+        let downd = false;
+        if ((Input.currentButtonState[button] === 1) && (Input.currentButtonState[button] === 1)) downd = true;
+        return downd;
+    }
+
+    static isMousePressed(button) {
+        let pressed = false;
+        if ((Input.currentButtonState[button] === 1) && (Input.previousButtonState[button]) === 0) pressed = true;
+        return pressed;
+    }
+
+    static isMouseReleased(button) {
+        let released = false;
+
+        if ((Input.currentButtonState[button] === 0) && (Input.previousButtonState[button] === 1)) released = true;
+
+        return released;
+
+    }
+
+    static isMouseUp(button) {
+        let up = false;
+
+        if (Input.currentButtonState[button] === 0) up = true;
+
+        return up;
+    }
+
+    static isKeyDown(key) {
+        return false;
+    }
+
+    static isKeyPressed(key) {
+        return false;
+    }
+
+    static isKeyReleased(key) {
+        return false;
+    }
+
+
+    static update() {
+        Input.mouseDX = 0;
+        Input.mouseDY = 0;
+
+        for (let i = 0; i < Input.MAX_TOUCH_POINTS; i++) {
+            Input.previousButtonState[i] = Input.currentButtonState[i];
+        }
+        for (let i = 0; i < Input.MAX_KEYBOARD_KEYS; i++) {
+            Input.previousKeyState[i] = Input.currentKeyState[i];
+        }
+    }
+}
+
+
+
+ class Tween {
+    constructor(target, property, from, to, duration, easing = Tween.EASE_LINEAR, mode = Tween.MODE_ONCE, now = true, autoremove = true) {
+        this.target = target;
+        this.property = property;
+        this.from = from;
+        this.to = to;
+        this.value = 0;
+        this.duration = duration;
+        this.easing = easing;
+        this.mode = mode;
+        this.autoremove = autoremove;
+        this.OnEnded = null;
+        this.elapsed = 0;
+        this.done = false;
+        this.forward = true;
+        this.active = now;
+        this.playing = false;
+        this.finished = false;
+    }
+
+    update(dt) {
+        if (!this.active || this.done) return;
+
+        this.elapsed += dt;
+
+        let t = Math.min(this.elapsed / this.duration, 1);
+        t = Tween.evaluateEasing(this.easing, t);
+
+        const start = this.forward ? this.from : this.to;
+        const end = this.forward ? this.to : this.from;
+        this.value = start + (end - start) * t;
+        this.target[this.property] = this.value;
+
+        if (this.elapsed >= this.duration) {
+            switch (this.mode) {
+                case Tween.MODE_ONCE:
+                    this.done = true;
+                    this.target[this.property] = this.to;
+                    this.playing = false;
+                    this.finished = true;
+                    break;
+                case Tween.MODE_LOOP:
+                    this.reset();
+                    if (this.OnEnded) this.OnEnded();
+                    this.playing = true;
+                    this.finished = true;
+                    break;
+                case Tween.MODE_PINGPONG:
+                    this.reset();
+                    if (this.OnEnded) this.OnEnded();
+                    this.forward = !this.forward;
+                    this.playing = true;
+                    this.finished = false;
+                    break;
+                case Tween.MODE_PERSIST:
+                    if (this.OnEnded) this.OnEnded();
+                    this.done = true;
+                    this.playing = false;
+                    this.finished = true;
+                    break;
+            }
+        }
+    }
+
+    reset() {
+        this.elapsed = 0;
+        this.done = false;
+        this.active = true;
+        this.playing = false;
+        this.finished = false;
+    }
+
+    play() {
+        this.elapsed = 0;
+        this.active = true;
+        this.done = false;
+        this.playing = true;
+    }
+
+    pause() {
+        this.active = false;
+    }
+}
+
+// Easing types
+// Tween easing types
+Tween.LINEAR = 0;
+
+Tween.EASE_IN_SINE = 1;
+Tween.EASE_OUT_SINE = 2;
+Tween.EASE_IN_OUT_SINE = 3;
+
+Tween.EASE_IN_QUAD = 4;
+Tween.EASE_OUT_QUAD = 5;
+Tween.EASE_IN_OUT_QUAD = 6;
+
+Tween.EASE_IN_CUBIC = 7;
+Tween.EASE_OUT_CUBIC = 8;
+Tween.EASE_IN_OUT_CUBIC = 9;
+
+Tween.EASE_IN_QUART = 10;
+Tween.EASE_OUT_QUART = 11;
+Tween.EASE_IN_OUT_QUART = 12;
+
+Tween.EASE_IN_QUINT = 13;
+Tween.EASE_OUT_QUINT = 14;
+Tween.EASE_IN_OUT_QUINT = 15;
+
+Tween.EASE_IN_EXPO = 16;
+Tween.EASE_OUT_EXPO = 17;
+Tween.EASE_IN_OUT_EXPO = 18;
+
+Tween.EASE_IN_CIRC = 19;
+Tween.EASE_OUT_CIRC = 20;
+Tween.EASE_IN_OUT_CIRC = 21;
+
+Tween.EASE_IN_BACK = 22;
+Tween.EASE_OUT_BACK = 23;
+Tween.EASE_IN_OUT_BACK = 24;
+
+Tween.EASE_IN_ELASTIC = 25;
+Tween.EASE_OUT_ELASTIC = 26;
+Tween.EASE_IN_OUT_ELASTIC = 27;
+
+Tween.EASE_IN_BOUNCE = 28;
+Tween.EASE_OUT_BOUNCE = 29;
+Tween.EASE_IN_OUT_BOUNCE = 30;
+
+
+// Modes
+Tween.MODE_ONCE = 0;
+Tween.MODE_LOOP = 1;
+Tween.MODE_PINGPONG = 2;
+Tween.MODE_PERSIST = 3;
+
+// Easing evaluator
+Tween.evaluateEasing = function (type, t) {
+    const PI = Math.PI;
+    const c1 = 1.70158;
+    const c2 = c1 * 1.525;
+    const c3 = c1 + 1;
+    const c4 = (2 * PI) / 3;
+    const c5 = (2 * PI) / 4.5;
+
+    function bounceOut(x) {
+        const n1 = 7.5625;
+        const d1 = 2.75;
+        if (x < 1 / d1) return n1 * x * x;
+        if (x < 2 / d1) return n1 * (x -= 1.5 / d1) * x + 0.75;
+        if (x < 2.5 / d1) return n1 * (x -= 2.25 / d1) * x + 0.9375;
+        return n1 * (x -= 2.625 / d1) * x + 0.984375;
+    }
+
+    Tween.evaluateEasing = function (type, t) {
+        switch (type) {
+            // Linear
+            case Tween.LINEAR:
+                return t;
+
+            // Sine
+            case Tween.EASE_IN_SINE:
+                return 1 - Math.cos((t * PI) / 2);
+            case Tween.EASE_OUT_SINE:
+                return Math.sin((t * PI) / 2);
+            case Tween.EASE_IN_OUT_SINE:
+                return -(Math.cos(PI * t) - 1) / 2;
+
+            // Quad
+            case Tween.EASE_IN_QUAD:
+                return t * t;
+            case Tween.EASE_OUT_QUAD:
+                return 1 - (1 - t) * (1 - t);
+            case Tween.EASE_IN_OUT_QUAD:
+                return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+            // Cubic
+            case Tween.EASE_IN_CUBIC:
+                return t * t * t;
+            case Tween.EASE_OUT_CUBIC:
+                return 1 - Math.pow(1 - t, 3);
+            case Tween.EASE_IN_OUT_CUBIC:
+                return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+            // Quart
+            case Tween.EASE_IN_QUART:
+                return t * t * t * t;
+            case Tween.EASE_OUT_QUART:
+                return 1 - Math.pow(1 - t, 4);
+            case Tween.EASE_IN_OUT_QUART:
+                return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+
+            // Quint
+            case Tween.EASE_IN_QUINT:
+                return t * t * t * t * t;
+            case Tween.EASE_OUT_QUINT:
+                return 1 - Math.pow(1 - t, 5);
+            case Tween.EASE_IN_OUT_QUINT:
+                return t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2;
+
+            // Expo
+            case Tween.EASE_IN_EXPO:
+                return t === 0 ? 0 : Math.pow(2, 10 * t - 10);
+            case Tween.EASE_OUT_EXPO:
+                return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+            case Tween.EASE_IN_OUT_EXPO:
+                if (t === 0) return 0;
+                if (t === 1) return 1;
+                return t < 0.5
+                    ? Math.pow(2, 20 * t - 10) / 2
+                    : (2 - Math.pow(2, -20 * t + 10)) / 2;
+
+            // Circ
+            case Tween.EASE_IN_CIRC:
+                return 1 - Math.sqrt(1 - Math.pow(t, 2));
+            case Tween.EASE_OUT_CIRC:
+                return Math.sqrt(1 - Math.pow(t - 1, 2));
+            case Tween.EASE_IN_OUT_CIRC:
+                return t < 0.5
+                    ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2
+                    : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2;
+
+            // Back
+            case Tween.EASE_IN_BACK:
+                return c3 * t * t * t - c1 * t * t;
+            case Tween.EASE_OUT_BACK:
+                return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+            case Tween.EASE_IN_OUT_BACK:
+                return t < 0.5
+                    ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+                    : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (2 * t - 2) + c2) + 2) / 2;
+
+            // Elastic
+            case Tween.EASE_IN_ELASTIC:
+                return t === 0
+                    ? 0
+                    : t === 1
+                        ? 1
+                        : -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
+            case Tween.EASE_OUT_ELASTIC:
+                return t === 0
+                    ? 0
+                    : t === 1
+                        ? 1
+                        : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+            case Tween.EASE_IN_OUT_ELASTIC:
+                return t === 0
+                    ? 0
+                    : t === 1
+                        ? 1
+                        : t < 0.5
+                            ? -(Math.pow(2, 20 * t - 10) * Math.sin((20 * t - 11.125) * c5)) / 2
+                            : (Math.pow(2, -20 * t + 10) * Math.sin((20 * t - 11.125) * c5)) / 2 + 1;
+
+            // Bounce
+            case Tween.EASE_IN_BOUNCE:
+                return 1 - bounceOut(1 - t);
+            case Tween.EASE_OUT_BOUNCE:
+                return bounceOut(t);
+            case Tween.EASE_IN_OUT_BOUNCE:
+                return t < 0.5
+                    ? (1 - bounceOut(1 - 2 * t)) / 2
+                    : (1 + bounceOut(2 * t - 1)) / 2;
+
+            // Default fallback (linear)
+            default:
+                return t;
+        }
+    }
+};
+
+ class Font {
+    constructor(size = 12, family = "Arial", color = "#ffffff") {
+        this.size = size;
+        this.family = family;
+        this.color = color;
+
+        this.align = "left";
+        this.baseline = "top";
+    }
+
+    apply(ctx) {
+        ctx.font = `${this.size}px ${this.family}`;
+        ctx.fillStyle = this.color;
+        ctx.textAlign = this.align;
+        ctx.textBaseline = this.baseline;
+    }
+
+    measure(text, ctx) {
+        this.apply(ctx);  
+        const metrics = ctx.measureText(text);
+        const width = metrics.width;
+        const height = this.size; // aproximação  
+        return { width, height };
+    }
+
+    clone() {
+        const copy = new Font(this.size, this.family, this.color);
+        copy.align = this.align;
+        copy.baseline = this.baseline;
+        return copy;
+    }
+}
+
+
+ class Graphics {
+    constructor(ctx) {
+        this.ctx = ctx;
+        this.currentFont = new Font(); // valor por defeito
+    }
+
+    save() { this.ctx.save(); }
+    restore() { this.ctx.restore(); }
+
+    setLineWidth(width) { this.ctx.lineWidth = width; }
+
+    setColor(color) {
+        this.ctx.fillStyle = color;
+        this.ctx.strokeStyle = color;
+    }
+
+    setStrokeColor(color) {
+        this.ctx.strokeStyle = color;
+    }
+
+    setFont(font) {
+        this.currentFont = font;
+        font.apply(this.ctx);
+    }
+
+    drawText(text, x, y)
+    {
+        this.ctx.fillText(text, x, y);
+    }
+
+    measureText(text) {
+        return this.currentFont.measure(text, this.ctx);
+    }
+
+    clear(color = "#000000") {
+        this.setColor(color);
+        this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+    }
+
+    fillRect(x, y, w, h) {
+        this.ctx.fillRect(x, y, w, h);
+    }
+
+    drawRect(x, y, w, h) {
+        this.ctx.strokeRect(x, y, w, h);
+    }
+    setMatrix(m) { this.ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f); }
+  setTransform(a, b, c, d, e, f) { this.ctx.setTransform(a, b, c, d, e, f); }
+  
+    drawCircle(x, y, r) { this.ctx.beginPath(); this.ctx.arc(x, y, r, 0, 2 * Math.PI); this.ctx.stroke(); }
+    fillCircle(x, y, r) {
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, r, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawLine(x1, y1, x2, y2) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y1);
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+    }
+    drawRoundedRect(x, y, w, h, r) {
+        const ctx = this.ctx;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+    }
+    drawRoundedLinesRect(x, y, w, h, r) {
+        const ctx = this.ctx;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.stroke();
+      }
+      clip(x, y, w, h) {
+        const ctx = this.ctx;
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        ctx.clip();
+      }
+    drawTriangle(x, y, size = 10, direction = 0)
+    {
+        const half = size / 2;
+        this.ctx.beginPath();
+    
+          if (direction === 0)
+          {
+            this.ctx.moveTo(x - half, y - half);
+            this.ctx.lineTo(x + half, y - half);
+            this.ctx.lineTo(x, y + half);
+        }
+          else if (direction === 1)
+          {
+            this.ctx.moveTo(x - half, y + half);
+            this.ctx.lineTo(x + half, y + half);
+            this.ctx.lineTo(x, y - half);
+        }
+          else if (direction === 2)
+          {
+            this.ctx.moveTo(x + half, y - half);
+            this.ctx.lineTo(x + half, y + half);
+            this.ctx.lineTo(x - half, y);
+        }
+          else if (direction === 3)
+          {
+            this.ctx.moveTo(x - half, y - half);
+            this.ctx.lineTo(x - half, y + half);
+            this.ctx.lineTo(x + half, y);
+        }
+    
+        this.ctx.closePath();
+        this.ctx.fill();
+    }
+    
+ }
+
+
+
+
+
+ class Margin
 {
     constructor(top = 0, right = 0, bottom = 0, left = 0)
     {
@@ -16,7 +742,7 @@ export class Margin
 }
 
 
-export class Theme
+ class Theme
 {
     // Buttons
     static buttonBackground = "#dddddd";
@@ -129,33 +855,6 @@ export class Theme
 
     static scrollbarTrack = "rgba(255,255,255,0.1)";
     static scrollbarThumb = "rgba(255,255,255,0.4)";
-
-    ///stepper
-    static stepperBackground = "#777";
-    static stepperBorder = "#bdc3c7";
-    static stepperButton = "#dfe6e9";
-    static stepperButtonText = "#2d3436";
-    static stepperText = "#000";
-
-    //spinner
-    static spinnerTrack = "#ccc";
-    static spinnerHead = "#3498db";
-
-    static toastBackground = "#333";
-    static toastBorder = "#555";
-    static toastText = "#fff";
-
-
-    static imageBorder = "#888";
-
-
-    static datepickerBackground = "#ecf0f1";
-    static datepickerBorder = "#bdc3c7";
-    static datepickerHeader = "#2c3e50";
-    static datepickerWeekday = "#7f8c8d";
-    static datepickerSelected = "#3498db";
-    static datepickerText = "#2c3e50";
-
 
 
     // Shared
@@ -624,38 +1323,14 @@ export class Theme
         Theme.windowButtonSymbol    = "#000";
         Theme.windowButtonSymbolHover = "#f00";
 
-        Theme.windowBorder = "#000";
-        
-
-        Theme.stepperBackground = "#ecf0f1";
-        Theme.stepperBorder = "#bdc3c7";
-        Theme.stepperButton = "#dfe6e9";
-        Theme.stepperButtonText = "#2d3436";
-        Theme.stepperText = "#2c3e50";
-
-
-
-        Theme.imageBorder = "#888";
-
-
-        Theme.datepickerBackground = "#ecf0f1";
-        Theme.datepickerBorder = "#bdc3c7";
-        Theme.datepickerHeader = "#2c3e50";
-        Theme.datepickerWeekday = "#7f8c8d";
-        Theme.datepickerSelected = "#3498db";
-        Theme.datepickerText = "#2c3e50";
-
-        Theme.toastBackground = "#333";
-        Theme.toastBorder = "#555";
-        Theme.toastText = "#fff";
-
+        Theme.windowBorder          = "#000";
 
     }
     
 }
 
 
-export class Widget
+ class Widget
 {
 
  
@@ -729,7 +1404,7 @@ export class Widget
 }
 
 
-export class Label extends Widget
+ class Label extends Widget
 {
     constructor(text = "", align = "left")
     {
@@ -782,7 +1457,7 @@ export class Label extends Widget
 }
 
 
-export class Button extends Widget {
+ class Button extends Widget {
     constructor(text = "Button", onClick = null)
     {
         super();
@@ -879,7 +1554,7 @@ export class Button extends Widget {
     
 }
 
-export class Panel extends Widget {
+ class Panel extends Widget {
     constructor(text = "", style = "flat") {
         super();
         this.text = text;
@@ -937,7 +1612,7 @@ export class Panel extends Widget {
 }
 
 
-export class TabItem
+ class TabItem
 {
     constructor(label, closable = false)
     {
@@ -951,7 +1626,7 @@ export class TabItem
 }
 
 
-export class TabView extends Widget {
+ class TabView extends Widget {
     constructor(position = "top") {
         super();
         this.tabs = [];
@@ -1172,7 +1847,7 @@ export class TabView extends Widget {
     }
 }
 
-export class Window extends Widget
+ class Window extends Widget
 {
     constructor(title = "Janela") {
         super(100, 100, 300, 200);
@@ -1192,7 +1867,6 @@ export class Window extends Widget
         this.scale = 0;
         this.tweenOut = new Tween(this, "scale", 0, 1, 1, Tween.EASE_OUT_BOUNCE, Tween.MODE_PERSIST, false);
         this.tweenOut.play();
-        this.onResize = null;
 
         // this.layout.add(new Button("Hello world!")).setPosition(0, 0);
         // this.layout.add(new Button("Hello world!")).setPosition(100, 100);
@@ -1296,8 +1970,6 @@ export class Window extends Widget
             {
                 this.width = Math.max(100, x - this.x);
                 this.height = Math.max(80, y - this.y);
-                if (this.onResize)
-                    this.onResize(this.width, this.height);
                 return true;
             }
                 if (this.dragBound.contains(x, y))
@@ -1368,24 +2040,23 @@ export class Window extends Widget
     
         // Título
         g.setColor(Theme.windowTitle);
-        g.drawText(this.title, this.x + 10, this.y + 15);
+        g.drawText(this.title, this.x + 10, this.y + 8);
     
         // Botões
         g.setColor(Theme.windowButtonClose);
-        g.fillRect(this.x + this.width - 25, this.y + 10, 15, 15); // [×]
+        g.fillRect(this.x + this.width - 25, this.y + 5, 15, 15); // [×]
         g.setColor(Theme.windowButtonMinimize);
-        g.fillRect(this.x + this.width - 45, this.y + 10, 15, 15); // [–]
+        g.fillRect(this.x + this.width - 45, this.y + 5, 15, 15); // [–]
     
         // Símbolos
         g.setColor(onClose ? Theme.windowButtonSymbolHover : Theme.windowButtonSymbol);
-        g.drawText("×", this.x + this.width - 22, this.y + 20);
+        g.drawText("×", this.x + this.width - 22, this.y + 7);
     
         g.setColor(onMinimize ? Theme.windowButtonSymbolHover : Theme.windowButtonSymbol);
-        g.drawText("–", this.x + this.width - 42, this.y + 20);
+        g.drawText("–", this.x + this.width - 42, this.y + 6);
     
         // Conteúdo
-        if (this.visible)
-        {
+        if (this.visible) {
             g.save();
             g.clip(this.x, this.y + this.barHeight, this.width, this.height - this.barHeight);
             g.ctx.translate(this.x, this.y + this.barHeight);
@@ -1423,7 +2094,7 @@ export class Window extends Widget
 }
 
 
-export class DragValueField extends Widget {
+ class DragValueField extends Widget {
     constructor(label = "X", value = 0.0, min = -Infinity, max = Infinity, step = 0.01) {
         super();
         this.label = label;
@@ -1510,7 +2181,7 @@ export class DragValueField extends Widget {
     
 }
 
-export class Checkbox extends Widget {
+ class Checkbox extends Widget {
     constructor(label = "", checked = false, onChange = null) {
         super();
         this.label = label;
@@ -1589,7 +2260,7 @@ export class Checkbox extends Widget {
     }
     
 }
-export class CheckboxGroup extends Widget {
+ class CheckboxGroup extends Widget {
     constructor(columns = 2) {
         super();
         this.columns = columns;
@@ -1667,7 +2338,7 @@ export class CheckboxGroup extends Widget {
     }
 }
 
-export class ToggleButton extends Widget
+ class ToggleButton extends Widget
 {
     constructor(checked = false, onChange = null) {
         super();
@@ -1745,7 +2416,7 @@ export class ToggleButton extends Widget
 
 
 
-export class RadioButton extends Widget
+ class RadioButton extends Widget
 {
     constructor(label = "",   value = null)
     {
@@ -1810,14 +2481,8 @@ export class RadioButton extends Widget
             g.fillCircle(cx, cy, this.radius - 3);
         }
     
-        const size = g.measureText(this.label);
-        const w = size.width;
-        const h = size.height;
-
         g.setColor(Theme.radioText);
-
-
-        g.drawText(this.label, cx + this.radius + this.padding, this.y + (this.height - 14) / 2);
+        g.drawText(this.label, cx + this.radius + this.padding, this.y + 5);
     
         if (this.hovered)
         {
@@ -1830,7 +2495,7 @@ export class RadioButton extends Widget
 }
 
 
-export class RadioGroup extends Widget
+ class RadioGroup extends Widget
 {
     constructor(onChange = null, columns = 1, spacing = 50)
     {
@@ -2042,7 +2707,7 @@ export class RadioGroup extends Widget
 }
 
 
-export class Slider extends Widget {
+ class Slider extends Widget {
     constructor(min = 0, max = 1, step = 0.01, value = 0, orientation = "horizontal")
     {
         super();
@@ -2151,7 +2816,7 @@ export class Slider extends Widget {
 }
 
 
-export class ProgressBar extends Widget {
+ class ProgressBar extends Widget {
     constructor(orientation = "horizontal") {
         super();
         this.value = 0;
@@ -2202,7 +2867,7 @@ export class ProgressBar extends Widget {
 
 
 
-export class Knob extends Widget {
+ class Knob extends Widget {
     constructor(min = 0, max = 1, step = 0.01, value = 0.5, onChange = null) {
         super();
         this.min = min;
@@ -2282,9 +2947,9 @@ export class Knob extends Widget {
     
         const cx = this.x + this.width / 2;
         const cy = this.y + this.height / 2;
-        let radius = Math.min(this.width, this.height) / 2 - 10;
-        if (radius < 8.0)
-            radius = 8;
+        const radius = Math.min(this.width, this.height) / 2 - 10;
+        if (radius < 1.0)
+            radius = 1;
         this.radius = radius;
     
         const valueRatio = (this.value - this.min) / (this.max - this.min);
@@ -2334,7 +2999,7 @@ export class Knob extends Widget {
 }
 
 
-export class SliderCircular extends Widget
+ class SliderCircular extends Widget
 {
     constructor( onChange)
     {
@@ -2392,63 +3057,70 @@ export class SliderCircular extends Widget
         return false;
     }
     
-    render(g) {
+    render(g)
+    {
         const ctx = g.ctx;
+        
+
         g.save();
-    
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        const radius = Math.max(0, Math.min(this.width, this.height) / 2);
-        const innerRadius = Math.max(0, radius - 15);
-        this.radius = radius;
-    
-        // Fundo
-        ctx.fillStyle = '#ecf0f1';
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.fill();
-    
-        // Borda
-        ctx.strokeStyle = '#bdc3c7';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.stroke();
-    
-        // Trilho
-        if (innerRadius > 0) {
+ 
+
+                const cx =this.x +  this.width / 2;
+                const cy =this.y +  this.height / 2;
+                const radius = Math.min(this.width, this.height) / 2;
+                if (radius < 1.0)
+                    radius = 1;
+                this.radius = radius;
+
+            // const cx =  this.width / 2;
+            // const cy =  this.height / 2;
+            // this.radius = Math.min(this.width, this.height) / 2;
+
+        
+            // Fundo do knob
+            ctx.fillStyle = '#ecf0f1';
+            ctx.beginPath();
+            ctx.arc(cx,cy, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+        
+            
+            // Borda
+            ctx.strokeStyle = '#bdc3c7';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx,cy, this.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Trilho
             ctx.strokeStyle = '#95a5a6';
             ctx.lineWidth = 10;
             ctx.beginPath();
-            ctx.arc(cx, cy, innerRadius, this.startAngle, this.endAngle);
+            ctx.arc(cx,cy, this.radius - 15, this.startAngle, this.endAngle);
             ctx.stroke();
-    
+            
             // Valor atual
             const valueAngle = this.startAngle + (this.endAngle - this.startAngle) * this.value;
             ctx.strokeStyle = '#3498db';
             ctx.beginPath();
-            ctx.arc(cx, cy, innerRadius, this.startAngle, valueAngle);
+            ctx.arc(cx,cy, this.radius - 15, this.startAngle, valueAngle);
             ctx.stroke();
-    
+            
             // Marcador
             ctx.fillStyle = '#2c3e50';
             ctx.beginPath();
-            const markerX = cx + Math.cos(valueAngle) * innerRadius;
-            const markerY = cy + Math.sin(valueAngle) * innerRadius;
+            const markerX = cx + Math.cos(valueAngle) * (this.radius - 15);
+            const markerY = cy + Math.sin(valueAngle) * (this.radius - 15);
             ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
             ctx.fill();
-        }
-        
-        
-        // Texto
-        ctx.fillStyle = '#2c3e50';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(Math.round(this.value * 100) + '%', cx, cy);
-    
-        ctx.lineWidth = 1;
-        g.restore();
+            
+            // Valor como texto
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(this.value * 100) + '%', cx,cy);
+            ctx.lineWidth = 1;
+            g.restore();
     }
     
     isPointInside(x, y)
@@ -2485,7 +3157,7 @@ export class SliderCircular extends Widget
    
 }
   
-export class TextView extends Widget
+ class TextView extends Widget
 {
     constructor(content)
     {
@@ -2655,7 +3327,7 @@ export class TextView extends Widget
   }
 
 
-export class WidgetListBox extends Widget {
+ class WidgetListBox extends Widget {
     constructor(itemHeight = 30) {
         super();
         this.items = [];
@@ -2779,7 +3451,7 @@ export class WidgetListBox extends Widget {
 }
 
 
-export class WidgetComboBox extends Widget
+ class WidgetComboBox extends Widget
 {
     constructor() {
         super();
@@ -2846,7 +3518,7 @@ export class WidgetComboBox extends Widget
 }
 
 
-export class ListBox extends Widget
+ class ListBox extends Widget
 {
     constructor() {
         super();
@@ -3004,7 +3676,7 @@ export class ListBox extends Widget
 }
 
 
-export class ComboBox extends Widget {
+ class ComboBox extends Widget {
     constructor(items = [], onSelect = null) {
         super();
         this.items = items;
@@ -3272,440 +3944,1148 @@ export class ComboBox extends Widget {
 }
 
 
-export class Stepper extends Widget
+ 
+class Layout extends Widget
 {
-    constructor(min = 0, max = 10, step = 1, value = 0, onChange = null) {
-        super();
-        this.min = min;
-        this.max = max;
-        this.step = step;
-        this.value = value;
-        this.onChange = onChange;
-        this.focus = false;
-        this.btnSize = 20;
-        this.hoverMinus = false;
-        this.hoverPlus = false;
-        this.state = 0;
-        this.progressive = false;
+    constructor(x = 0, y = 0, width = 1, height = 1)
+    {
+        super(x, y, width, height);
+        this.children = [];
+        this.debug = false;
+        this.margin = new Margin(0, 0, 0, 0);
+        this.usePercentage = false;
+        this.opaque = false;
+        this.color ="#ccc"
+
     }
 
-    handleMouse(type, x, y, button) {
-        if (!this.visible || !this.enabled) return false;
+    setColor(color)
+    {
+        this.color = color;
+    }
 
-        const localX = x - this.x;
-        const localY = y - this.y;
-        
-        
-            if (type == 2)
+    clear()
+    {
+        this.children = [];
+    }
+
+    setMargins(left = 0, top = 0, right = 0, bottom = 0)
+    {
+        this.margin.left = left;
+        this.margin.top = top;
+        this.margin.right = right;
+        this.margin.bottom = bottom;
+    }
+
+    add(widget)
+    {
+        this.children.push(widget);
+        return widget;
+    }
+
+
+    update(dt)
+    {
+        if (!this.visible) return;
+        this.children.forEach(child => child.update(dt));
+    }
+
+    render(g)
+    {
+        if (!this.visible) return;
+
+        if (this.opaque)
             {
-                this.focus = this.contains(x, y);
+                const outerX = this.x - this.margin.left;
+                const outerY = this.y - this.margin.top;
+                const outerW = this.width + this.margin.left + this.margin.right;
+                const outerH = this.height + this.margin.top + this.margin.bottom;
+                g.setColor(this.color);
+                g.fillRect(outerX, outerY, outerW, outerH);
+                
             }
+        
+        if (this.debug)
+        {
+           this.renderDebug(g);
 
+        }
+        this.children.forEach(child =>
+        {
+            child.reset();
+            if (child.visible) child.render(g);
+        });
+      //  console.log("render",this.x, this.y, this.width, this.height);
+    }
+
+    resize(width, height)
+    {
+        this.width = width;
+        this.height = height;
+        this.updateLayout();
+    }
     
-            // Botão menos
-            if (type === 0 && localX >= 0 && localX <= this.btnSize)
+    
+
+    handleMouse(type, x, y, button)
+    {
+       // console.log("layout handleMouse", type, x, y, button);
+        if (!this.enabled) return false;
+
+      
+
+        let ignore = -1;
+      
+        if (type === 1)
+        {
+            for (let i = this.children.length - 1; i >= 0; i--)
             {
-                this.value = Math.max(this.min, this.value - this.step);
-                if (this.onChange) this.onChange(this.value);
-                this.focus = true;
-                this.state = 1;
-                return true;
+                const child = this.children[i];
+                if (child.handleMouse(1, x, y, button))
+                {
+
+                }
+            }
+        }
+        // propagar do topo (último desenhado) para o fundo
+        if (type === 0 || type === 2)
+        {
+            for (let i = this.children.length - 1; i >= 0; i--)
+            {
+                const child = this.children[i];
+                if (child.handleMouse(type, x, y, button))
+                {
+                  //  return true;
+                    ignore = i;
+                    break;
+                }
+            
+            }
+        }
+
+        // for (let i = this.children.length - 1; i >= 0; i--)
+        // {
+        //     if (i !== ignore)
+        //     {
+        //         const child = this.children[i];
+        //         child.handleMouseOut(x, y);
+        //     }
+        // }
+
+        return false;
+    }
+
+    renderDebug(g) {
+        // 1. Área total do widget com margens
+        const outerX = this.x - this.margin.left;
+        const outerY = this.y - this.margin.top;
+        const outerW = this.width + this.margin.left + this.margin.right;
+        const outerH = this.height + this.margin.top + this.margin.bottom;
+    
+        // 2. Desenhar margem (zona em volta do widget)
+        g.setColor("rgba(122, 211, 100, 0.2)"); // laranja
+        g.fillRect(outerX, outerY, outerW, outerH);
+    
+        // 3. Desenhar conteúdo 
+        g.setColor("rgba(255, 123, 0, 0.62)"); // vermelho
+        g.fillRect(this.x, this.y, this.width, this.height);
+    
+   
+    }
+    
+}
+
+ class HorizontalLayout extends Layout
+{
+    constructor(x = 0, y = 0, width = 100, height = 100) {
+        super(x, y, width, height);
+        this.setMargins(10, 10, 10, 10);
+        this.usePercentage = false;
+        this.spacing = 5;
+    }
+
+
+
+    updateLayout() {
+        const count = this.children.length;
+        if (count === 0) return;
+
+        const m = this.margin;
+        const spacing = this.spacing;
+
+        const innerWidth = this.width - m.left - m.right;
+        const innerHeight = this.height - m.top - m.bottom;
+
+        let totalPercent = 0;
+        for (const child of this.children)
+        {
+            totalPercent += child.heightPercent;
+        }
+
+        const totalSpacing = spacing * (count - 1);
+        const fixedHeight = innerHeight - totalSpacing;
+        const childHeight = fixedHeight / count;
+
+        let currentY = this.y + m.top;
+
+        for (let i = 0; i < count; i++) {
+            const child = this.children[i];
+
+            child.x = this.x + m.left;
+            child.y = currentY;
+
+            if (this.usePercentage)
+                child.height = fixedHeight * child.heightPercent;
+            else
+                child.height = childHeight;
+
+            child.width = innerWidth;
+
+            child.resize(innerWidth, child.height);
+
+            currentY += child.height + spacing;
+        }
+    }
+   
+}
+
+
+ class VerticalLayout extends Layout
+{
+    constructor(x = 0, y = 0, width = 100, height = 100)
+    {
+        super(x, y, width, height);
+        this.setMargins(10, 10, 10, 10);
+        this.usePercentage = false;
+        this.spacing = 5;
+  
+    }
+    updateLayout()
+    {
+        const count = this.children.length;
+        if (count === 0) return;
+    
+        const m = this.margin;
+        const spacing = this.spacing ;
+    
+        const innerWidth = this.width - m.left - m.right;
+        const innerHeight = this.height - m.top - m.bottom;
+    
+        let totalPercent = 0;
+        for (const child of this.children)
+        {
+            totalPercent += child.widthPercent;
+        }
+    
+        const totalSpacing = spacing * (count - 1);
+        const fixedWidth = (innerWidth - totalSpacing);
+        const childWidth = fixedWidth / count;
+    
+        let currentX = this.x + m.left;
+    
+        for (let i = 0; i < count; i++)
+        {
+            const child = this.children[i];
+    
+            child.x = currentX;
+            child.y = this.y + m.top;
+    
+            if (this.usePercentage)
+                child.width = fixedWidth * child.widthPercent ;
+            else
+                child.width = childWidth;
+    
+            child.height = innerHeight;
+    
+            child.resize(child.width, innerHeight);
+    
+            currentX += child.width  + spacing;
+
+        }
+    }
+    
+    
+}
+
+
+ class AnchorLayout extends Layout
+{
+    constructor(x = 0, y = 0, width = 100, height = 100)
+    {
+        super(x, y, width, height);
+        this.anchors = new Map(); // child -> anchorConfig
+    }
+
+    setAnchor(child, anchor)
+    {
+        this.add(child);
+        this.anchors.set(child, anchor);
+    }
+
+    updateLayout()
+    {
+        const parentX = this.x + this.margin.left;
+        const parentY = this.y + this.margin.top;
+        const parentW = this.width - this.margin.left - this.margin.right;
+        const parentH = this.height - this.margin.top - this.margin.bottom;
+
+        for (const child of this.children)
+        {
+            const anchor = this.anchors.get(child) || {};
+
+            // Horizontal
+            if (anchor.left !== undefined && anchor.right !== undefined)
+            {
+                child.x = parentX + anchor.left;
+                child.width = parentW - anchor.left - anchor.right;
+            } else if (anchor.centerX !== undefined)
+            {
+                const offset = anchor.centerX;
+                child.x = parentX + (parentW / 2) - (child.width / 2) + offset;
+            } else if (anchor.left !== undefined)
+            {
+                child.x = parentX + anchor.left;
+            } else if (anchor.right !== undefined)
+            {
+                child.x = parentX + parentW - child.width - anchor.right;
             }
 
-            // Botão mais
-            if (type === 0 && localX >= this.width - this.btnSize && localX <= this.width) {
-                this.value = Math.min(this.max, this.value + this.step);
-                if (this.onChange) this.onChange(this.value);
-                this.focus = true;
-                this.state = 2;
-                return true;
+            // Vertical
+            if (anchor.top !== undefined && anchor.bottom !== undefined)
+            {
+                child.y = parentY + anchor.top;
+                child.height = parentH - anchor.top - anchor.bottom;
+            } else if (anchor.centerY !== undefined)
+            {
+                const offset = anchor.centerY;
+                child.y = parentY + (parentH / 2) - (child.height / 2) + offset;
+            } else if (anchor.top !== undefined)
+            {
+                child.y = parentY + anchor.top;
+            } else if (anchor.bottom !== undefined)
+            {
+                child.y = parentY + parentH - child.height - anchor.bottom;
             }
+
+            child.resize(child.width, child.height);
+        }
+    }
+}
+
+
+
+ class ConstraintLayout extends Layout {
+    constructor(x = 0, y = 0, width = 100, height = 100) {
+        super(x, y, width, height);
+        this.anchors = new Map(); // Map<Widget, AnchorInfo>
+    }
+
+    setAnchor(widget, anchorInfo) {
+        this.anchors.set(widget, anchorInfo);
+        this.add(widget);
+    }
+    updateLayout()
+    {
+        const parentX = this.x + this.margin.left;
+        const parentY = this.y + this.margin.top;
+        const parentW = this.width - this.margin.left - this.margin.right;
+        const parentH = this.height - this.margin.top - this.margin.bottom;
+    
+        // 1ª Passagem – Calcular x e y
+        for (const child of this.children)
+        {
+            const anchor = this.anchors.get(child);
+            if (!anchor) continue;
+    
+            // Horizontal
+            if (anchor.leftToLeft)
+            {
+                const ref = anchor.leftToLeft;
+                child.x = (ref === this ? parentX : ref.x) + (anchor.marginLeft || 0);
+            }
+            else if (anchor.leftToRight)
+            {
+                const ref = anchor.leftToRight;
+                child.x = (ref === this ? parentX + parentW : ref.x + ref.width) + (anchor.marginLeft || 0);
+            }else if (anchor.rightToRight)
+                {
+                    const right = (anchor.rightToRight === this ? parentX + parentW : anchor.rightToRight.x + anchor.rightToRight.width) - (anchor.marginRight || 0);
+                    child.x = right - child.width;
+                }
         
-        this.state = 0;
+                else if (anchor.rightToLeft)
+                {
+                    const right = (anchor.rightToLeft === this ? parentX : anchor.rightToLeft.x) - (anchor.marginRight || 0);
+                    child.x = right - child.width;
+                }
+    
+            // Vertical
+            if (anchor.topToTop)
+            {
+                const ref = anchor.topToTop;
+                 child.y = (ref === this ? parentY : ref.y) + (anchor.marginTop || 0);
+            }
+            else if (anchor.topToBottom)
+            {
+                const ref = anchor.topToBottom;
+                child.y = (ref === this ? parentY + parentH : ref.y + ref.height) + (anchor.marginTop || 0);
+            }else if (anchor.bottomToBottom)
+                {
+                    const bottom = (anchor.bottomToBottom === this ? parentY + parentH : anchor.bottomToBottom.y + anchor.bottomToBottom.height) - (anchor.marginBottom || 0);
+                    child.y = bottom - child.height;
+                }
+                else if (anchor.bottomToTop)
+                {
+                    const bottom = (anchor.bottomToTop === this ? parentY : anchor.bottomToTop.y) - (anchor.marginBottom || 0);
+                    child.y = bottom - child.height;
+                }
+        }
+    
+        // 2ª Passagem – Calcular width e height (se ambos os lados forem definidos)
+        for (const child of this.children)
+        {
+            const anchor = this.anchors.get(child);
+            if (!anchor) continue;
+    
+
+                
+            // WIDTH
+            if (anchor.leftToRight && anchor.rightToLeft)
+                {
+                    const left = (anchor.leftToRight === this 
+                        ? parentX 
+                        : anchor.leftToRight.x + anchor.leftToRight.width) 
+                        + (anchor.marginLeft || 0);
+                
+                    const right = (anchor.rightToLeft === this 
+                        ? parentX + parentW 
+                        : anchor.rightToLeft.x) 
+                        - (anchor.marginRight || 0);
+                
+                    child.x = left;
+                    child.width = right - left;
+                }
+                
+            
+    
+            // HEIGHT
+            if (anchor.topToBottom && anchor.bottomToTop)
+            {
+          
+                const topRef    = anchor.topToBottom;
+                const bottomRef = anchor.bottomToTop;
+            
+                const top = (topRef === this ? parentY + parentH : topRef.y + topRef.height)  + (anchor.marginTop || 0);
+                const bottom = (bottomRef === this ? parentY : bottomRef.y) - (anchor.marginBottom || 0);
+            
+                child.y = top;
+                child.height = bottom - top;
+            }
             
 
-        return false;
-    }
-
-    render(g) {
-        if (!this.visible) return;
-
-
-        if (this.progressive)
-        {
-            if (this.focus && Input.isMouseDown(0))
+            if (anchor.leftToLeft && anchor.rightToRight)
             {
-                if (this.state === 2) {
-                    this.value = Math.min(this.max, this.value + this.step);
-                    if (this.onChange) this.onChange(this.value);
-                    this.focus = true;
-                }
-                if (this.state === 1) {
-                    this.value = Math.max(this.min, this.value - this.step);
-                    if (this.onChange) this.onChange(this.value);
-                }
+                const left = (anchor.leftToLeft === this ? parentX : anchor.leftToLeft.x) + (anchor.marginLeft || 0);
+                const right = (anchor.rightToRight === this ? parentX + parentW : anchor.rightToRight.x + anchor.rightToRight.width) - (anchor.marginRight || 0);
+                child.x = left;
+                child.width = right - left;
             }
-        }
-
-        // Caixa principal
-         g.setColor(Theme.stepperBackground);
-         g.fillRect(this.x, this.y, this.width, this.height);
-         g.setColor(Theme.stepperBorder);
-         g.drawRect(this.x, this.y, this.width, this.height);
-
-        // Botão menos
-        g.setColor(Theme.stepperButton);
-        g.fillRect(this.x, this.y, this.btnSize, this.height);
-        g.setColor(Theme.stepperButtonText);
-        g.drawText("−", this.x + 6, this.y + 4);
-
-        // Botão mais
-        g.setColor(Theme.stepperButton);
-        g.fillRect(this.x + this.width - this.btnSize, this.y, this.btnSize, this.height);
-        g.setColor(Theme.stepperButtonText);
-        g.drawText("+", this.x + this.width - this.btnSize + 4, this.y + 4);
-
-
-        if (this.focus)
-        {
-            g.setColor("red");
-            g.drawRect(this.x, this.y, this.width, this.height);
-        }
-
-        // Valor
-        const valText = this.value.toString();
-        const text = g.measureText(valText);
-        g.setColor(Theme.stepperText);
-        g.drawText(valText, this.x + this.width / 2 - text.width / 2, this.y + (this.height *0.5) - (text.height*0.5));
-    }
-}
-
-
-
-class StringStepper extends Widget {
-    constructor(items = [], index = 0, onChange = null) {
-        super();
-        this.items = items;
-        this.index = index;
-        this.onChange = onChange;
-
-        this.btnSize = 20;
-    }
-
-    handleMouse(type, x, y, button) {
-        if (!this.visible || !this.enabled) return false;
-
-        const localX = x - this.x;
-
-        if (type === 0) {
-            // Botão esquerdo ‹
-            if (localX >= 0 && localX <= this.btnSize) {
-                if (this.index > 0) {
-                    this.index--;
-                    if (this.onChange) this.onChange(this.index, this.items[this.index]);
-                }
-                return true;
+            
+            if (anchor.topToTop && anchor.bottomToBottom)
+            {
+                const top = (anchor.topToTop === this ? parentY : anchor.topToTop.y) + (anchor.marginTop || 0);
+                const bottom = (anchor.bottomToBottom === this ? parentY + parentH : anchor.bottomToBottom.y + anchor.bottomToBottom.height) - (anchor.marginBottom || 0);
+                child.y = top;
+                child.height = bottom - top;
             }
-
-            // Botão direito ›
-            if (localX >= this.width - this.btnSize && localX <= this.width) {
-                if (this.index < this.items.length - 1) {
-                    this.index++;
-                    if (this.onChange) this.onChange(this.index, this.items[this.index]);
-                }
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    render(g) {
-        if (!this.visible) return;
-
-        g.setColor(Theme.stepperBackground);
-        g.fillRect(this.x, this.y, this.width, this.height);
-        g.setColor(Theme.stepperBorder);
-        g.drawRect(this.x, this.y, this.width, this.height);
-
-        // Botões ‹ e ›
-        g.setColor(Theme.stepperButton);
-        g.fillRect(this.x, this.y, this.btnSize, this.height);
-        g.fillRect(this.x + this.width - this.btnSize, this.y, this.btnSize, this.height);
-
-        g.setColor(Theme.stepperButtonText);
-        g.drawText("‹", this.x + 6, this.y + 4);
-        g.drawText("›", this.x + this.width - this.btnSize + 6, this.y + 4);
-
-        // Texto atual
-        const text = this.items[this.index] || "";
-        g.setColor(Theme.stepperText);
-        const m = g.measureText(text);
-        g.drawText(text, this.x + this.width / 2 - m.width / 2, this.y + this.height / 2 + m.height / 2 - 6);
-    }
-
-    getValue() {
-        return this.items[this.index];
-    }
-
-    setValue(str) {
-        const i = this.items.indexOf(str);
-        if (i !== -1) this.index = i;
-    }
-}
-
-export class Spinner extends Widget {
-    constructor(size = 24) {
-        super();
-        this.size = size;
-        this.angle = 0;
-    }
-
-    update(dt) {
-        this.angle += dt * 6; // 6 rad/s
-    }
-
-    render(g) {
-        if (!this.visible) return;
-
-        const cx = this.x + this.size / 2;
-        const cy = this.y + this.size / 2;
-        const r = this.size / 2 - 2;
-
-        g.setLineWidth(3);
-        g.setColor(Theme.spinnerTrack);
-        g.drawCircle(cx, cy, r);
-
-        g.setColor(Theme.spinnerHead);
-        const x = cx + Math.cos(this.angle) * r;
-        const y = cy + Math.sin(this.angle) * r;
-        g.drawLine(cx, cy, x, y);
-
-        g.setLineWidth(1);
-    }
-}
-
-
-export class NotificationBox extends Widget {
-    constructor(text = "", duration = 2.5) {
-        super();
-        this.text = text;
-        this.duration = duration; // segundos visível
-        this.timer = 0;
-        this.active = false;
-    }
-
-    show(text, duration = null) {
-        this.text = text;
-        this.duration = duration !== null ? duration : this.duration;
-        this.timer = this.duration;
-        this.active = true;
-        this.visible = true;
-    }
-
-    update(dt) {
-        if (this.active) {
-            this.timer -= dt;
-            if (this.timer <= 0) {
-                this.active = false;
-                this.visible = false;
-            }
+            
+    
+            child.resize(child.width, child.height);
         }
     }
+    
 
-    render(g) {
-        if (!this.visible) return;
+}
 
-        const padding = 10;
-      //  g.setFont("bold 14px Arial");
-        const textMetrics = g.measureText(this.text);
-        const boxWidth = textMetrics.width + padding * 2;
-        const boxHeight = 30;
+class Fragment {
+   constructor() {
+       this.width = 1;
+       this.height = 1;
+       this.layout = new Layout(0, 0, this.width, this.height);
+       this.tweens = [];
+       this.firstTime = true;
+       this.activity = null;
+   }
 
-        const x = (640 - boxWidth) / 2;
-        const y = 200; // Topo da tela
+   onResize(width, height) {
+       this.width = width;
+       this.height = height;
+   
+       this.layout.resize(width, height);
+   }
+   addTween(tween) {
+       this.tweens.push(tween);
+       return tween;
+   }
+   onCreate()
+   {
 
-        g.setColor(Theme.toastBackground);
-        g.fillRect(x, y, boxWidth, boxHeight);
+       if (this.firstTime)
+       {
+           this.create(); 
+           this.firstTime = false;
+           return;
+       }
+       
+   }
+   onUpdate(dt) {
+       for (let i = 0; i < this.tweens.length; ++i)
+           this.tweens[i].update(dt);
+       this.tweens = this.tweens.filter(t => !t.done || !t.autoremove);
 
-        g.setColor(Theme.toastBorder);
-        g.drawRect(x, y, boxWidth, boxHeight);
+       this.update(dt);
+       this.layout.update(dt);
+   }
+   onRender(g) {
+       this.render(g);
+       this.layout.render(g);
 
-        g.setColor(Theme.toastText);
-        g.drawText(this.text, x + padding, y + (boxHeight - 14) / 2 + 7);
-    }
+   }
+   onHandleMouse(type, x, y, button) {
+       if (this.layout)
+       {
+
+           if (this.layout.handleMouse(type, x, y, button)) return true;
+       }
+       return this.handleMouse(type, x, y, button);
+   }
+   onClose()
+   {
+
+       this.close();
+   }
+
+   onEnter() {
+       this.enter();
+
+   }
+
+   //virtuals
+
+   enter() { }
+
+   create() { }
+
+   update(dt) { }
+
+   render(g) { }
+
+   handleMouse(type, x, y, button) { }
+
+   close() { }
 }
 
 
-export class ImageBox extends Widget {
-    constructor(image = null, fit = "contain") {
-        super();
-        this.image = image;  // Objeto Image()
-        this.fit = fit;      // "contain" | "cover" | "stretch"
-    }
+class FragmentTransition {
+   constructor(duration = 1.0) {
+       this.duration = duration;
+       this.time = 0;
+       this.finished = false;
+       this.fragment = null;
+       this.old = null;
+       this.tweens = [];
+       this.width = 1;
+       this.height = 1;
+   }
 
-    setImage(src) {
-        this.image = new Image();
-        this.image.src = src;
-    }
+   
 
-    setFitMode(mode) {
-        this.fit = mode;
-    }
+   addTween(tween) {
+       this.tweens.push(tween);
+       return tween;
+   }
+   start(fragment, old = null)
+   {
+       this.fragment = fragment;
+       this.old = old;
+       this.time = 0;
+       this.finished = false;
+   }
 
-    render(g) {
-        if (!this.visible || !this.image) return;
 
-        const img = this.image;
-        const { width, height } = this;
+   update(dt) {
 
-        let drawWidth = width;
-        let drawHeight = height;
-        let offsetX = 0;
-        let offsetY = 0;
+       for (let i = 0; i < this.tweens.length; ++i)
+       {
+           this.tweens[i].update(dt);
+       }
+       this.tweens = this.tweens.filter(t => !t.done || !t.autoremove);
+       this.time += dt;
+       if (this.time >= this.duration)
+       {
+           this.finished = true;
+       }
+       if (this.fragment)
+           this.fragment.onUpdate(dt);
+   }
 
-        if (this.fit === "contain") {
-            const scale = Math.min(width / img.width, height / img.height);
-            drawWidth = img.width * scale;
-            drawHeight = img.height * scale;
-            offsetX = (width - drawWidth) / 2;
-            offsetY = (height - drawHeight) / 2;
-        }
-        else if (this.fit === "cover") {
-            const scale = Math.max(width / img.width, height / img.height);
-            drawWidth = img.width * scale;
-            drawHeight = img.height * scale;
-            offsetX = (width - drawWidth) / 2;
-            offsetY = (height - drawHeight) / 2;
-        }
-        else if (this.fit === "stretch") {
-            drawWidth = width;
-            drawHeight = height;
-        }
+   render(g) {
+       // Implementado nas subclasses
+   }
 
-        g.ctx.drawImage(
-            img,
-            this.x + offsetX,
-            this.y + offsetY,
-            drawWidth,
-            drawHeight
-        );
+   isFinished() {
+       return this.finished;
+   }
+}
 
-        g.setColor(Theme.imageBorder);
-        g.drawRect(this.x, this.y, width, height);
-    }
+class FadeInTransition extends FragmentTransition
+{
+
+   render(g)
+   {
+       const alpha = Math.min(1, this.time / this.duration);
+       const oldalpha = g.ctx.globalAlpha;
+       g.ctx.globalAlpha = alpha;
+       if (this.fragment)
+           this.fragment.onRender(g);
+     //  console.log("alpha", alpha);
+
+       g.ctx.globalAlpha = oldalpha;
+   }
+}
+
+class FadeOutTransition extends FragmentTransition {
+   render(g) {
+       const alpha = 1 - Math.min(1, this.time / this.duration);
+       const oldalpha = g.ctx.globalAlpha;
+       g.ctx.globalAlpha = alpha;
+
+
+       if (this.fragment)
+           this.fragment.onRender(g);
+
+       g.ctx.globalAlpha = oldalpha;
+   }
 }
 
 
-export class DatePicker extends Widget {
-    constructor(onSelect = null) {
-        super();
-        const today = new Date();
-        this.currentYear = today.getFullYear();
-        this.currentMonth = today.getMonth(); // 0 = Janeiro
-        this.selectedDay = today.getDate();
-        this.onSelect = onSelect;
+class SlideLeftTransition extends FragmentTransition
+{
+   constructor(duration = 1.0)
+   {
+       super(duration);
+       this.timeA = 0;
+       this.timeB = 0;
+       this.addTween(new Tween(this, "timeA", 1, 0, this.duration, Tween.EASE_OUT_BOUNCE, Tween.MODE_ONCE));
+       this.addTween(new Tween(this, "timeB", 0, 1, this.duration, Tween.EASE_OUT_BACK, Tween.MODE_ONCE));
+   } 
+
+   render(g)
+   {
+        const w = this.width;
+
+        
+        // Slide out old fragment (move para a esquerda)
+        if (this.old)
+       {
+           g.ctx.save();
+           g.ctx.translate(-this.timeB * w -(w*0.5), 0);
+            this.old.onRender(g);
+           g.ctx.restore();
+       }
+
+       // Slide in new fragment (entra da direita)
+       if (this.fragment)
+       {
+           g.ctx.save();
+           g.ctx.translate(this.timeA * w, 0);
+           this.fragment.onRender(g);
+           g.ctx.restore();
+       }
+
+       g.ctx.restore();
+   }
+}
+
+class SlideRightTransition extends FragmentTransition
+{
+   constructor(duration = 1.0)
+   {
+       super(duration);
+       this.time = 0;
+       this.timeA = 0;
+       this.timeB = 0;
+       this.addTween(new Tween(this, "timeA", 1, 0, this.duration, Tween.EASE_OUT_BOUNCE, Tween.MODE_ONCE));
+       this.addTween(new Tween(this, "timeB", 0, 1, this.duration, Tween.EASE_OUT_BACK, Tween.MODE_ONCE));
+
+   }
+   render(g)
+   {
+        const w = this.width;
+
+        
+        
+        if (this.old)
+       {
+           g.ctx.save();
+           g.ctx.translate(this.timeB * w +(w*0.5), 0);
+           this.old.onRender(g);
+           g.ctx.restore();
+       }
+
+       // Slide in new fragment (entra da direita)
+       if (this.fragment)
+       {
+           g.ctx.save();
+           g.ctx.translate(-this.timeA * w, 0);
+           this.fragment.onRender(g);
+           g.ctx.restore();
+       }
+   }
+}
+
+
+
+class Navigator {
+
+   static instance = null;
+   constructor() {
+       this.fragmentMap = new Map();
+       this.activeFragment = null;
+       this.pendingFragment = null;
+       this.outTransition = null;
+       this.inTransition = null;
+       this.isTrasition = false;
+       this.width = 0;
+       this.height = 0;
+       this.realWidth = 0;
+       this.realHeight = 0;
+
+   }
+
+   static Instance() {
+       if (!Navigator.instance) {
+           Navigator.instance = new Navigator();
+       }
+       return Navigator.instance;
+   }
+
+   setFragment(name) {
+
+       if (this.activeFragment)
+       {
+           this.activeFragment.onClose();
+       }
+       const newFrag = this.fragmentMap.get(name);
+       if (!newFrag || newFrag === this.activeFragment)
+       {
+           console.log("Fragmento não encontrado");
+           return;
+       }
+       this.activeFragment = newFrag;
+       this.activeFragment.onResize(this.width, this.height);
+       this.activeFragment.onCreate();
+   }
+
+   addFragment(name, fragment) {
+
+       fragment.width = this.width;
+       fragment.height = this.height;
+       this.fragmentMap.set(name, fragment);
+   }
+
+   switchFragment(name, outTransition = null, inTransition = null)
+   {
+       const newFrag = this.fragmentMap.get(name);
+       if (!newFrag || newFrag === this.activeFragment) return;
+
+       this.pendingFragment = newFrag;
+       this.outTransition = outTransition;
+       this.inTransition = inTransition;
+
+       if (!outTransition && !inTransition)
+       {
+           if (this.activeFragment) this.activeFragment.onClose();
+           this.activeFragment = this.pendingFragment;
+           this.pendingFragment = null;
+           this.activeFragment.onResize(this.width, this.height);
+           this.activeFragment.onCreate();
+           return;
+       }
+
+       // Preparar fragmento novo (antes da transição in)
+       if (inTransition)
+       {
+           inTransition.width = this.width;
+           inTransition.height = this.height;
+           this.pendingFragment.onResize(this.width, this.height);
+           this.pendingFragment.onCreate();
+       }
+
+       // Iniciar transição de saída, se existir
+       if (outTransition && this.activeFragment)
+       {
+           outTransition.width = this.width;
+           outTransition.height = this.height;
+           this.outTransition.start(this.activeFragment,this.pendingFragment);
+       }
+       else if (inTransition)
+       {
+           // Se só há transição de entrada
+
+           this.inTransition.start(this.pendingFragment,this.activeFragment);
+           this.activeFragment = this.pendingFragment;
+           this.pendingFragment = null;
+
+       }
+   }
+
+
+
+
+
+
+
+   resize(rw, rh, w, h)
+   {
+       this.width = w;
+       this.height = h;
+       this.realWidth = rw;
+       this.realHeight = rh;
+
+       if (this.activeFragment)
+       {
+           //   console.log("navigation resize", w, h);
+           this.activeFragment.onResize(w, h);
+       }
+
+   }
+
+   handleMouse(type, x, y, button) {
+       // console.log("frgment handleMouse", type, x, y, button);
+       if (this.activeFragment) {
+           if (this.activeFragment.onHandleMouse(type, x, y, button))
+           {
+               return true;
+           }
+       }
+       return false;
+   }
+   _finalizeSwitch()
+   {
+       if (this.activeFragment)
+       {
+       
+           this.activeFragment.onClose();
+       }
+
+       this.activeFragment = this.pendingFragment;
+       this.pendingFragment = null;
+
+       if (this.activeFragment)
+       {
+           this.activeFragment.onResize(this.width, this.height);
+           this.activeFragment.onCreate();
+       }
+
+       if (this.inTransition)
+       {
+           this.inTransition.fragment = this.activeFragment;
+           this.inTransition.start(this.activeFragment);
+       }
+   }
+
+   update(g, dt)
+   {   
+
+     
+       if (this.outTransition)
+       {
+           this.outTransition.width  = this.realWidth;
+           this.outTransition.height = this.realHeight;
+           this.outTransition.update(dt);
+           this.outTransition.render(g);
+           if (this.outTransition.isFinished())
+           {
+               this.outTransition = null;
+                this._finalizeSwitch(); 
+           }
+           return;
+       }
+   
+       if (this.inTransition)
+       {
+           this.inTransition.width  = this.realWidth;
+           this.inTransition.height = this.realHeight;
+           this.inTransition.update(dt);
+           this.inTransition.render(g);
+           if (this.inTransition.isFinished())
+           {
+               this.inTransition = null;
+           }
+           return;
+       }
+   
+       if (this.activeFragment)
+       {
+           this.activeFragment.onUpdate(dt);
+           this.activeFragment.onRender(g);
+       }
+   }
+   
+   
+
+}
+
+
+ class Activity {
+    constructor(canvas, virtualWidth = 550, virtualHeight = 800, fitMode = "none") {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext("2d");
+        this.g = null;
+        this.fragment = null;
+        this.virtualWidth = virtualWidth;
+        this.virtualHeight = virtualHeight;
+        this.width = virtualWidth;
+        this.height = virtualHeight;
+        this.fitMode = fitMode; // "fit", "stretch", "fill"
+        Navigator.Instance();
+        this.scaleX = 1;
+        this.scaleY = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.pointX = 0;
+        this.pointY = 0;
+
+        this.resizeCanvas();
+        window.addEventListener("resize", () => this.resizeCanvas());
+
+
+        window.addEventListener("keydown", e => Input.onKeyDown(e.code));
+        window.addEventListener("keyup", e => Input.onKeyUp(e.code));
+
+        canvas.addEventListener("mousedown", e => this._onMouseDown(e));
+        canvas.addEventListener("mouseup", e => this._onMouseUp(e));
+        canvas.addEventListener("mousemove", e => this._onMouseMove(e));
+        this._setupTouchAsMouse(canvas);
+
+
+
+        Input.init();
+
+        this.firstRender = true;
+
+        // FPS
+        this.fps = 0;
+        this._frames = 0;
+        this._fpsTime = 0;
     }
 
-    getDaysInMonth(year, month) {
-        return new Date(year, month + 1, 0).getDate();
+    _setupTouchAsMouse(canvas) {
+        const getTouchPos = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0] || e.changedTouches[0];
+            return {
+                clientX: touch.clientX - rect.left,
+                clientY: touch.clientY - rect.top
+            };
+        };
+
+        canvas.addEventListener("touchstart", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                button: 0,
+                clientX,
+                clientY
+            };
+            this._onMouseDown(fakeMouseEvent);
+            e.preventDefault();
+        });
+
+        canvas.addEventListener("touchmove", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                clientX,
+                clientY
+            };
+            this._onMouseMove(fakeMouseEvent);
+            e.preventDefault();
+        });
+
+        canvas.addEventListener("touchend", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                button: 0,
+                clientX,
+                clientY
+            };
+            this._onMouseUp(fakeMouseEvent);
+            e.preventDefault();
+        });
+
+        canvas.addEventListener("touchcancel", e => {
+            const { clientX, clientY } = getTouchPos(e);
+            const fakeMouseEvent = {
+                button: 0,
+                clientX,
+                clientY
+            };
+            this._onMouseUp(fakeMouseEvent);
+            e.preventDefault();
+        });
     }
 
-    handleMouse(type, x, y, button) {
-        if (!this.visible || !this.enabled) return false;
 
-        if (type !== 0) return false;
+    _onMouseDown(e) {
+        Input.onMouseDown(e.button);
+        const { x, y } = this._getMouseCoords(e);
+        Input.onMouseMove(x, y); // atualiza também a posição
+        this.pointX = x;
+        this.pointY = y;
+        this._handleMouse(Input.Mouse.DOWN, x, y, e.button);
+    }
 
-        const localX = x - this.x;
-        const localY = y - this.y;
+    _onMouseUp(e) {
+        Input.onMouseUp(e.button);
+        const { x, y } = this._getMouseCoords(e);
+        Input.onMouseMove(x, y);
+        this._handleMouse(Input.Mouse.UP, x, y, e.button);
+    }
 
-        const cellSize = 32;
-        const offsetY = 40;
+    _onMouseMove(e) {
+        const { x, y } = this._getMouseCoords(e);
+        Input.onMouseMove(x, y);
+        this._handleMouse(Input.Mouse.MOVE, x, y, -1);
+    }
 
-        if (localY < offsetY) {
-            // Clique em navegação (Mês)
-            if (localX < this.width / 2) {
-                this.currentMonth--;
-                if (this.currentMonth < 0) {
-                    this.currentMonth = 11;
-                    this.currentYear--;
-                }
+    _handleMouse(type, x, y, button) {
+        Navigator.Instance().handleMouse(type, x, y, button);
+    }
+
+    resizeCanvas() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        this.width = w;
+        this.height = h;
+        this.canvas.width = w;
+        this.canvas.height = h;
+
+        const aspectCanvas = w / h;
+        const aspectVirtual = this.virtualWidth / this.virtualHeight;
+
+        if (this.fitMode === "fit") {
+            if (aspectCanvas > aspectVirtual) {
+                this.scaleY = h / this.virtualHeight;
+                this.scaleX = this.scaleY;
             } else {
-                this.currentMonth++;
-                if (this.currentMonth > 11) {
-                    this.currentMonth = 0;
-                    this.currentYear++;
-                }
+                this.scaleX = w / this.virtualWidth;
+                this.scaleY = this.scaleX;
+
+
             }
-            return true;
+            this.offsetX = (w - this.virtualWidth * this.scaleX) / 2;
+            this.offsetY = (h - this.virtualHeight * this.scaleY) / 2;
+        } else if (this.fitMode === "stretch") {
+            this.scaleX = w / this.virtualWidth;
+            this.scaleY = h / this.virtualHeight;
+
+            this.offsetX = 0;// (w - this.virtualWidth * this.scaleX) / 2;
+            this.offsetY = 0;// (h - this.virtualHeight * this.scaleY) / 2;
+        } else if (this.fitMode === "fill") {
+            //this.scaleX = this.scaleY = Math.max(w / this.virtualWidth, h / this.virtualHeight);
+            this.scaleX = this.canvas.width / this.virtualWidth;
+            this.scaleY = this.canvas.height / this.virtualHeight;
+            this.offsetX = 0;
+            this.offsetY = 0;
+        } else if (this.fitMode === "none") {
+            this.scaleX = this.scaleY = 1;
+            this.offsetX = 0;
+            this.offsetY = 0;
+            this.virtualWidth = w;
+            this.virtualHeight = h;
         }
 
-        const row = Math.floor((localY - offsetY) / cellSize);
-        const col = Math.floor(localX / cellSize);
+        Navigator.Instance().resize(w, h, this.virtualWidth, this.virtualHeight);
 
-        const firstDay = new Date(this.currentYear, this.currentMonth, 1).getDay();
-        const dayIndex = row * 7 + col - firstDay + 1;
 
-        const daysInMonth = this.getDaysInMonth(this.currentYear, this.currentMonth);
-        if (dayIndex >= 1 && dayIndex <= daysInMonth) {
-            this.selectedDay = dayIndex;
-            if (this.onSelect) {
-                this.onSelect(new Date(this.currentYear, this.currentMonth, this.selectedDay));
-            }
-        }
+    }
+    // resizeCanvas()
+    // {
+    //     this.canvas.width = window.innerWidth;
+    //     this.canvas.height = window.innerHeight;
+    //     if (this.fragment)
+    //     {
+    //         this.fragment.onResize(this.canvas.width, this.canvas.height);
+    //     }
+    // }
 
-        return false;
+    _getMouseCoords(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const realX = e.clientX - rect.left;
+        const realY = e.clientY - rect.top;
+
+        const x = (realX - this.offsetX) / this.scaleX;
+        const y = (realY - this.offsetY) / this.scaleY;
+
+        return { x, y };
     }
 
-    render(g) {
-        if (!this.visible) return;
 
-        const cellSize = 32;
-        const offsetY = 40;
 
-        // Fundo
-        g.setColor(Theme.datepickerBackground);
-        g.fillRect(this.x, this.y, this.width, this.height);
-        g.setColor(Theme.datepickerBorder);
-        g.drawRect(this.x, this.y, this.width, this.height);
+    setGraphics(g) {
+        this.g = g;
+    }
 
-        // Cabeçalho (Ano e Mês)
-        const months = [
-            "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-            "Jul", "Ago", "Set", "Out", "Nov", "Dez"
-        ];
-        const headerText = `${months[this.currentMonth]} ${this.currentYear}`;
+    setFragment(fragment) {
+        Navigator.Instance().setFragment(fragment);
+    }
 
-        g.setColor(Theme.datepickerHeader);
-        g.drawText(headerText, this.x + this.width / 2 - g.measureText(headerText).width / 2, this.y + 24);
+    addFragment(name, fragment) {
+        fragment.activity = this;
+        Navigator.Instance().addFragment(name, fragment);
+    }
 
-        // Dias da semana
-        const days = ["D", "S", "T", "Q", "Q", "S", "S"];
-        g.setColor(Theme.datepickerWeekday);
-        for (let i = 0; i < 7; i++) {
-            const tx = this.x + i * cellSize + 10;
-            g.drawText(days[i], tx, this.y + offsetY - 8);
-        }
+    switchFragment(name, outTransition = null, inTransition = null) {
+        Navigator.Instance().switchFragment(name, outTransition, inTransition);
+    }
 
-        // Dias do mês
-        const firstDay = new Date(this.currentYear, this.currentMonth, 1).getDay();
-        const daysInMonth = this.getDaysInMonth(this.currentYear, this.currentMonth);
+    start() {
+        const loop = (now) => {
+            const dt = (now - this.lastTime) / 1000;
+            this.lastTime = now;
 
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dayPos = day + firstDay - 1;
-            const row = Math.floor(dayPos / 7);
-            const col = dayPos % 7;
-
-            const tx = this.x + col * cellSize;
-            const ty = this.y + offsetY + row * cellSize;
-
-            if (day === this.selectedDay) {
-                g.setColor(Theme.datepickerSelected);
-                g.fillRect(tx, ty, cellSize, cellSize);
+            this._frames++;
+            this._fpsTime += dt;
+            if (this._fpsTime >= 1.0) {
+                this.fps = this._frames;
+                this._frames = 0;
+                this._fpsTime = 0;
             }
+            if (this.firstRender) {
+                this.firstRender = false;
+                this.resizeCanvas();
+            }
+            this.g.clear();
+            this.ctx.save();
 
-            g.setColor(Theme.datepickerText);
-            g.drawText(day.toString(), tx + 10, ty + 20);
-        }
+            this.ctx.translate(this.offsetX, this.offsetY);
+            this.ctx.scale(this.scaleX, this.scaleY);
+
+
+
+            Navigator.Instance().update(this.g, dt);
+            this.g.fillCircle(this.pointX, this.pointY, 4);
+            this.ctx.restore();
+
+            this.g.setColor("#rgb(45,45,45");
+            this.g.drawText(`FPS: ${this.fps} (${this.width}/${this.height}) `, 10, this.height - 16, 14);
+
+
+            Input.update();
+            requestAnimationFrame(loop);
+        };
+
+        this.lastTime = performance.now();
+        requestAnimationFrame(loop);
     }
 }
