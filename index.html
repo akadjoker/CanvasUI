@@ -28,6 +28,8 @@
     <script src="core/FieldValue.js"></script>
     <script src="core/Sliders.js"></script>
     <script src="core/Lists.js"></script>
+    <script src="core/Window.js"></script>
+    <script src="core/Text.js"></script>
     
     
     
@@ -132,6 +134,41 @@ class Main extends Fragment
             combobox.setSize(120,30);
             
         }
+
+        const loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
+                        const text = new TextView(loremIpsum);
+                        text.setPosition(500, 10);
+                        text.setSize(300, 300);
+                        this.layout.add(text);
+                        
+
+
+                        const scrollBar = new ScrollBar(0);
+                        scrollBar.setPosition(400, 200);
+                        scrollBar.setSize(20, 300);
+                        scrollBar.setContent(2000, 100); 
+                        this.layout.add(scrollBar);
+
+
+                        const view = new LayoutScroll();
+                        view.setPosition(20, 350);
+                        view.setSize(200, 200);
+                        view.add(new Button("Teste")).setPosition(10, 10).setSize(100, 30);
+                        view.add(new Button("Teste")).setPosition(100, 50).setSize(100, 30);
+                        view.add(new Button("Teste")).setPosition(200, 200).setSize(100, 30);
+                        this.layout.add(view);
+
+
+        // const window = new Window();
+        // window.setPosition(400, 100);
+        // window.setSize(200, 200);
+
+      
+
+      
+       
+
+        // this.layout.add(window);
     
     
    }

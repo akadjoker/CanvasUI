@@ -405,4 +405,120 @@ class Stepper extends Widget
     }
 }
 
- 
+class ScrollBar extends Widget
+{
+    constructor(orientation = 0)
+    {
+        super();
+        this.orientation = orientation; // vertical ou horizontal
+
+        this.trackColor = "#444";
+        this.thumbColor = "#888";
+
+        this.scrollValue = 0; // de 0.0 a 1.0
+        this.visibleRatio = 0.2; // 20% visível inicialmente
+
+        this.dragging = false;
+        this.dragStartMouse = 0;
+        this.dragStartScroll = 0;
+    }
+
+    
+    render(g)
+    {
+
+        g.setColor(Theme.colors[SCROLL_BAR]);
+        g.fillRect(this.x, this.y, this.width, this.height, this.trackColor);
+        this.bound.set(this.x, this.y, this.width, this.height);
+
+        g.setColor(this.dragging ? Theme.colors[SCROLL_BAR_THUMB] : Theme.colors[SCROLL_BAR_THUMB_MOVE]);
+        
+        if (this.orientation === 0)
+        {
+            const thumbHeight = this.height * this.visibleRatio;
+            const thumbY = this.y + this.scrollValue * (this.height - thumbHeight);
+            this.thumbX = this.x+1;
+            this.thumbY = thumbY;
+            this.thumbWidth = this.width-2;
+            this.thumbHeight = thumbHeight;
+
+            
+            g.fillRect(this.thumbX, this.thumbY, this.thumbWidth, this.thumbHeight, this.thumbColor);
+        } else
+        {
+            const thumbWidth = this.width * this.visibleRatio;
+            const thumbX = this.x + this.scrollValue * (this.width - thumbWidth);
+            this.thumbX = thumbX;
+            this.thumbY = this.y+1;
+            this.thumbWidth = thumbWidth;
+            this.thumbHeight = this.height-2;
+
+            
+           g.fillRect(this.thumbX, this.thumbY, this.thumbWidth, this.thumbHeight, this.thumbColor);
+        }
+    }
+
+    setContent(totalSize, viewSize)
+    {
+        if (totalSize <= viewSize)
+        {
+            this.visibleRatio = 1;
+        } else
+        {
+            this.visibleRatio = viewSize / totalSize;
+        }
+    }
+
+    scrollBy(delta)
+    {
+        this.scrollValue = Math.max(0, Math.min(1, this.scrollValue + delta));
+    }
+
+    isInsideThumb(mx, my)
+    {
+        return mx >= this.thumbX && mx <= this.thumbX + this.thumbWidth &&
+               my >= this.thumbY && my <= this.thumbY + this.thumbHeight;
+    }
+
+    handleMouseDown(mx, my)
+    {
+        if (this.isInsideThumb(mx, my))
+        {
+            this.dragging = true;
+            this.dragStartMouse = (this.orientation === 0) ? my : mx;
+            this.dragStartScroll = this.scrollValue;
+            return true;
+        }
+        return false;
+    }
+
+    handleMouseMove(mx, my)
+    {
+        this.isHovered = this.contains(mx, my);
+        if (this.dragging)
+        {
+            const totalMove = (this.orientation === 0) ? my - this.dragStartMouse : mx - this.dragStartMouse;
+            const totalLength = (this.orientation === 0) ? this.height - this.thumbHeight : this.width - this.thumbWidth;
+            if (totalLength > 0)
+            {
+                this.scrollValue = this.dragStartScroll + (totalMove / totalLength);
+                this.scrollValue = Math.max(0, Math.min(1, this.scrollValue));
+            }
+            return true;
+        }
+        return false;
+    }
+
+    handleMouseUp()
+    {
+        this.dragging = false;
+
+    }
+    handleMouseWheel(value)
+    {
+        if (!this.active || !this.visible || !this.isHovered) return false;
+        this.scrollValue += value * 0.1;
+        this.scrollValue = Math.max(0, Math.min(1, this.scrollValue));
+        return true;
+    }
+}

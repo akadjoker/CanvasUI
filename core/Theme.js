@@ -78,7 +78,22 @@ const COMBOBOX_LIST_HOVER = 61;
 const COMBOBOX_LIST_SELECT = 62;
 const COMBOBOX_TEXT = 63;
 
- 
+
+const WINDOW_BAR = 64;
+const WINDOW_BAR_HOVER = 65;
+const WINDOW_TITLE = 66;
+const WINDOW_BACKGROUND = 67;
+const WINDOW_RESIZE_LINES = 68;
+
+const WINDOW_BUTTON_CLOSE = 69;
+const WINDOW_BUTTON_MINIMIZE = 70;
+const WINDOW_BUTTON_SYMBOL = 71;
+const WINDOW_BUTTON_SYMBOL_HOVER = 72;
+const WINDOW_BORDER = 73;
+
+const SCROLL_BAR = 74;
+const SCROLL_BAR_THUMB = 75;
+const SCROLL_BAR_THUMB_MOVE = 76;
 
 class Theme 
 {
@@ -161,6 +176,23 @@ class Theme
        Theme.colors[COMBOBOX_LIST_BACKGROUND] = "#ccc";
        Theme.colors[COMBOBOX_LIST_HOVER] = "rgba(100,100,100,0.1)";
        Theme.colors[COMBOBOX_LIST_SELECT] = "rgba(100,100,100,0.3)";
+
+       Theme.colors[WINDOW_BAR] = "#333";
+       Theme.colors[WINDOW_BAR_HOVER] = "#444";
+       Theme.colors[WINDOW_TITLE] = "#fff";
+       Theme.colors[WINDOW_BACKGROUND] = "#f0f0f0";
+       Theme.colors[WINDOW_RESIZE_LINES] = "#888";
+
+       Theme.colors[WINDOW_BUTTON_CLOSE]     = "#aaa";
+       Theme.colors[WINDOW_BUTTON_MINIMIZE]  = "#aaa";
+       Theme.colors[WINDOW_BUTTON_SYMBOL]    = "#000";
+       Theme.colors[WINDOW_BUTTON_SYMBOL_HOVER] = "#f00";
+
+       Theme.colors[WINDOW_BORDER] = "#000";
+       
+       Theme.colors[SCROLL_BAR] = "#bdc3c7";
+       Theme.colors[SCROLL_BAR_THUMB] = "#7f8c8d";
+       Theme.colors[SCROLL_BAR_THUMB_MOVE] = "#95a5a6";
 
 
 

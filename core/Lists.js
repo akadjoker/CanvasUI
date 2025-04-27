@@ -15,6 +15,7 @@ class ListBox extends Widget
         this.dragStartY = 0;
         this.scrollStart = 0;
         this.dragging = false;
+        this.size = 0;
  
     }
 
@@ -79,11 +80,17 @@ class ListBox extends Widget
             this.scroll = this.scrollStart - dy;
             this.clampScroll();
             return true;
-        }  else  if ( this.isHovered)
+        }
+        
+        if (this.isHovered)
         {
             const index = Math.floor((localY + this.scroll) / this.itemHeight);
             this.hoverIndex = index;
+            return true;
         }
+
+        this.dragging = false;
+        this.hoverIndex = -1;
         
         return false;
     }
@@ -205,15 +212,25 @@ class ComboBox extends Widget
         this.boxSize = 20;
         this.lastItem = -1;
         this.default = "Select...";
-        // Animação
-        this.listAnimation = 0;  // entre 0 e 1
-        this.listTarget = 0;     // objetivo (0 fechado, 1 aberto)
-        this.listSpeed = 6;      // velocidade da animação
+
+        this.scale = 0;
+        this.tweenOut = new Tween(this, "scale", 0, 1, 0.5, Tween.EASE_OUT_BOUNCE, Tween.MODE_PERSIST, false, false);
+        this.tweenOut.stop();
+
+        this.tweenOut.OnEnded = () =>
+        {
+           
+        }
+
     }
 
-    toggleOpen() {
+    toggleOpen()
+    {
+
+       
+       
         this.open = !this.open;
-        this.listTarget = this.open ? 1 : 0;
+      
     }
 
     setSize(w, h)
@@ -250,14 +267,15 @@ class ComboBox extends Widget
     {
         const localY = y - this.y; // y relativo ao início do ComboBox
     
-         
-             
+                   
 
                 if (this.open)
                 {
                     if (this.contains(x, y))
                     {
+                        
                         this.isPressed = true;
+                            
                         this.onClick();
         
                         this.dragging = true;
@@ -272,6 +290,17 @@ class ComboBox extends Widget
                         return true;
                     } else
                     {
+                        
+                   
+                        
+                             if (this.open)
+                            {
+                                this.tweenOut.reset();
+                                this.tweenOut.to = 0;
+                                this.tweenOut.from = 1;
+                                this.tweenOut.ease = Tween.EASE_IN_ELASTIC;
+                                this.tweenOut.play();
+                            } 
                         this.toggleOpen();
                         return false;
                     }
@@ -308,7 +337,7 @@ class ComboBox extends Widget
                 this.clampScroll();
                 return true;
                 } 
-            else
+            else if (this.isHovered)
             {
                 const index = Math.floor((localY + this.scroll - this.boxSize) / this.itemHeight);
                 this.hoverIndex = index;
@@ -320,7 +349,33 @@ class ComboBox extends Widget
     }
     handleMouseUp(x, y)
     {
-        this.isPressed = false;
+
+            if (this.pointInBox(x, y))
+            {
+                
+                    this.tweenOut.reset();
+    
+                        // this.tweenOut.to = 1;
+                        // this.tweenOut.from = 0;
+                        // this.tweenOut.ease = Tween.EASE_IN_ELASTIC;
+                 
+                    if (!this.open)
+                    {
+                        this.tweenOut.to = 0;
+                        this.tweenOut.from = 1;
+                        this.tweenOut.ease = Tween.EASE_IN_ELASTIC;
+                    } else 
+                    {
+                        this.tweenOut.to = 1;
+                        this.tweenOut.from = 0;
+                        this.tweenOut.ease = Tween.EASE_OUT_ELASTIC;
+                    }
+                    this.tweenOut.play();
+                    console.log("Play");
+                
+            }
+
+            this.isPressed = false;
             if (this.dragging)
             {
                 this.dragging = false;
@@ -331,8 +386,10 @@ class ComboBox extends Widget
                 {
                      this.selectedIndex = index;
                     if (this.onSelect) this.onSelect(index, this.items[index]);
-                    this.toggleOpen();
+                   
+                        this.toggleOpen();
                 }
+                return true;
             }
         
         this.hoverIndex = -1;
@@ -355,13 +412,14 @@ class ComboBox extends Widget
 
     update(dt)
     {
-        if (this.listAnimation !== this.listTarget)
-        {
-            const dir = Math.sign(this.listTarget - this.listAnimation);
-            this.listAnimation += dir * this.listSpeed * dt;
-            if (dir > 0 && this.listAnimation > this.listTarget) this.listAnimation = this.listTarget;
-            if (dir < 0 && this.listAnimation < this.listTarget) this.listAnimation = this.listTarget;
-        }
+        if (!this.visible) return;
+
+        this.tweenOut.update(dt);
+
+           
+
+
+        
     }
     
     add(text)
@@ -411,22 +469,28 @@ class ComboBox extends Widget
         const visibleCount = Math.min(this.maxVisibleItems, this.items.length);
         const listHeight = visibleCount * this.itemHeight;
         this.bound.set(this.x, this.y, this.width, this.boxSize);
+
+        let progresss = listHeight * this.scale;
+       // console.log(progresss);
+     
         
 
-        if (this.open)
+        if (this.scale>0.01)
         {
             // Fundo da lista
-            g.setColor(Theme.colors[COMBOBOX_LIST_BACKGROUND]);
-            g.fillRect(this.x, this.y + this.boxSize, this.width, listHeight);
-        //    g.clip(this.x, this.y + this.boxSize, this.width, listHeight);
+            this.bound.set(this.x, this.y+ this.boxSize, this.width,  listHeight);
             g.save();
+            g.setColor(Theme.colors[COMBOBOX_LIST_BACKGROUND]);
+            g.fillRect(this.x, this.y + this.boxSize, this.width, progresss);
+            g.clip(this.x, this.y + this.boxSize, this.width, progresss);
             g.ctx.translate(0, -this.scroll);
+            
 
             for (let i = 0; i < this.items.length; i++)
             {
                 const itemY = this.y + this.boxSize + i * this.itemHeight;
 
-                if (itemY + (this.itemHeight-13) - this.scroll > this.y + this.boxSize + listHeight) break;
+                if (itemY + (this.itemHeight-13) - this.scroll > this.y + this.boxSize + progresss) break;
                 if (itemY - this.scroll < this.y + this.boxSize-13) continue;
 
                 if (i === this.selectedIndex)
@@ -442,27 +506,14 @@ class ComboBox extends Widget
                 const itemTextY = itemY + ((this.itemHeight*0.5) );
                 g.drawText(this.items[i], this.x + 10, itemTextY);
             }
-            this.bound.set(this.x, this.y+ this.boxSize, this.width,  listHeight);
             
             g.ctx.translate(0, this.scroll);
             g.restore();
-        }
-            
-            // Borda
-            g.setColor(Theme.colors[COMBOBOX_BORDER]);
-            g.drawRect(this.bound.x, this.bound.y, this.bound.width, this.bound.height);
-            //g.drawRect(this.x, this.y, this.width, this.boxSize);
-            
-
-        
-        if (this.open)
-        {
-        
             const totalHeight = this.items.length * this.itemHeight;
             if (totalHeight > this.height)
             {
-                const scrollRatio = this.scroll / (totalHeight - this.height);
-                const thumbHeight = Math.max(20, (this.height / totalHeight) * this.height);
+                const scrollRatio = this.scroll / (totalHeight - listHeight);
+                const thumbHeight = Math.max(20, ((this.height+this.boxSize) / totalHeight) * listHeight);
                 const thumbY = this.y + this.boxSize + scrollRatio * (listHeight - thumbHeight);
                 const barX = this.x + this.width - tumb;
     
@@ -475,25 +526,16 @@ class ComboBox extends Widget
                 g.fillRect(barX, thumbY, tumb, thumbHeight);
             }
         }
-        
+            
+            // Borda
+            g.setColor(Theme.colors[COMBOBOX_BORDER]);
+            g.drawRect(this.bound.x, this.bound.y, this.bound.width, this.bound.height);
+            //g.drawRect(this.x, this.y, this.width, this.boxSize);
+            
 
-            // const totalHeight = this.items.length * this.itemHeight;
-            // if (totalHeight > fullListHeight && this.open)
-            // {
-            //     const scrollRatio = this.scroll / (totalHeight - fullListHeight);
-            //     const thumbHeight = Math.max(20, (fullListHeight / totalHeight) * listHeight);
-            //     const thumbY = this.y + this.boxSize + scrollRatio * (listHeight - thumbHeight);
-            //     const barX = this.x + this.width - tumb;
-            
-            //     // Track (barra de fundo)
-            //     g.setColor(Theme.colors[LISTBOX_BAR] );
-            //     g.fillRect(barX, this.y + this.boxSize, tumb, listHeight);
-            
-            //     // Thumb (indicador de progresso)
-            //     g.setColor(Theme.colors[LISTBOX_THUMB] );
-            //     g.fillRect(barX, thumbY, tumb, thumbHeight);
-            // }
-            
+        
+        
+        
 
 
      

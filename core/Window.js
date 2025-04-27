@@ -15,41 +15,28 @@
         this.barHeight = 30;
         this.resizeZone = 15;
         this.dragOffset = { x: 0, y: 0 };
-        this.bound = new Rectangle(0, 0, 0, 0);
+       
         this.closeBound = new Rectangle(this.width - 30, 0, 30, 30);
         this.dragBound = new Rectangle(0, 0, this.width, this.barHeight);
         this.resizeBound = new Rectangle(this.width - this.resizeZone, this.height - this.resizeZone, this.resizeZone, this.resizeZone);
         this.minimizeBound = new Rectangle(this.width - this.resizeZone * 2, this.height - this.resizeZone, this.resizeZone, this.resizeZone);
         this.layout = new Layout();
         this.scale = 0;
-        this.tweenOut = new Tween(this, "scale", 0, 1, 1, Tween.EASE_OUT_BOUNCE, Tween.MODE_PERSIST, false);
-        this.tweenOut.play();
+        this.tween = new Tween(this, "scale", 0, 1, 1, Tween.EASE_OUT_BOUNCE, Tween.MODE_PERSIST, false,false);
+        this.tween.play();
         this.onResize = null;
 
-        // this.layout.add(new Button("Hello world!")).setPosition(0, 0);
-        // this.layout.add(new Button("Hello world!")).setPosition(100, 100);
-        // this.layout.add(new Button("Hello world!")).setPosition(200, 200);
+
         
         
 
     }
 
-
-
-
-    handleMouse(type, x, y, button)
+    handleMouseDown(x, y)
     {
-        if (!this.enabled) return false;
-
-        // const inside = this.contains(x, y);
-        // if (!inside && type !== 1) return false;
-
         const localX = x - this.x;
         const localY = y - this.y;
 
-        if (type === 0)
-        { // Mouse down
-            
             if (this.dragBound.contains(x, y))
             {
                 this.dragging = true;
@@ -59,7 +46,7 @@
             }
     
             if (this.minimizeBound.contains(x, y))
-                {
+            {
                     return true;
             }
     
@@ -75,7 +62,7 @@
                 return true;
             }
 
-            if (this.layout.handleMouse(type, localX - this.layout.x, localY - this.layout.y - this.barHeight, button))
+            if (this.layout.handleMouseDown( localX - this.layout.x, localY - this.layout.y - this.barHeight))
             {
                 return true;
             }
@@ -83,41 +70,13 @@
             {
                 return true;
             }
-        }
 
-  
-
-        if (type === 1 && this.contains(x, y))
-        { // Mouse up
-            this.dragging = false;
-            this.resizing = false;
-            if (this.closeBound.contains(x, y))
-                {
-                    this.visible = false;
-                    return true;
-                }
-                if (this.minimizeBound.contains(x, y))
-                {
-                    if (!this.tweenOut.playing)
-                    {
-                        this.tweenOut.reset();
-                        this.tweenOut.play();
-                        this.minimized = !this.minimized;
-                    }
-                    return true;
-                }
-            if (this.layout.handleMouse(type, localX - this.layout.x, localY - this.layout.y - this.barHeight, button))
-            {
-                return true;
-            }
-            if (this.bound.contains(x, y))
-                {
-                    return true;
-                }
-        }
-
-        if (type === 2)
-        { // Mouse move
+        return false;
+    }
+    handleMouseMove(x, y)
+    {
+        const localX = x - this.x;
+        const localY = y - this.y;
             if (this.dragging)
             {
                 this.x = x - this.dragOffset.x;
@@ -132,46 +91,88 @@
                     this.onResize(this.width, this.height);
                 return true;
             }
-                if (this.dragBound.contains(x, y))
-                {
-                    return true;
-                }
+            if (this.dragBound.contains(x, y))
+            {
+                return true;
+            }
+    
+            
+    
+            if (this.resizeBound.contains(x, y))
+            {
+                return true;
+            }
+            
+            if (this.minimizeBound.contains(x, y))
+            {
+                return true;
+            }
         
-                
-        
-                if (this.resizeBound.contains(x, y))
+            if (this.layout.handleMouseMove(localX - this.layout.x, localY - this.layout.y - this.barHeight))
                 {
                     return true;
                 }
-                
-                if (this.minimizeBound.contains(x, y))
-                {
-                    return true;
-                }
-        }
-
-        return this.layout.handleMouse(type, localX - this.layout.x,localY - this.layout.y -this.barHeight, button);
+       
+        return false;
     }
+    handleMouseUp(x, y)
+    {
+        const localX = x - this.x;
+        const localY = y - this.y;
+        if (this.contains(x, y))
+        { 
+            this.dragging = false;
+            this.resizing = false;
+            if (this.closeBound.contains(x, y))
+            {
+                this.visible = false;
+                return true;
+            }
+            if (this.minimizeBound.contains(x, y))
+            {
+                if (!this.tween.playing)
+                {
+                    this.tween.reset();
+                    this.tween.play();
+                    this.minimized = !this.minimized;
+                }
+                return true;
+            }
+            if (this.layout.handleMouseUp(localX - this.layout.x, localY - this.layout.y - this.barHeight))
+            {
+                return true;
+            }
+            
+            return true;
+            
+        }
+        
+        return false;
+    }
+    handleMouseWheel(value) { return false; }
+   
+
 
     update(dt)
     {
         if (!this.visible) return;
         this.layout.update(dt);
-        this.tweenOut.update(dt);
+        this.tween.update(dt);
 
-        if (this.tweenOut.finished)
+
+        if (this.tween.finished)
         {
           
-            if (this.tweenOut.value === 0)
+            if (this.tween.value === 0)
             {
-                this.tweenOut.to = 1;
-                this.tweenOut.from = 0;
-                this.tweenOut.ease = Tween.EASE_IN_ELASTIC;
+                this.tween.to = 1;
+                this.tween.from = 0;
+                this.tween.ease = Tween.EASE_IN_ELASTIC;
             } else 
             {
-                this.tweenOut.to = 0;
-                this.tweenOut.from = 1;
-                this.tweenOut.ease = Tween.EASE_OUT_ELASTIC;
+                this.tween.to = 0;
+                this.tween.from = 1;
+                this.tween.ease = Tween.EASE_OUT_ELASTIC;
             }
             
         }
@@ -193,26 +194,34 @@
         const onMinimize = this.minimizeBound.contains(Input.mouseX, Input.mouseY);
         const onDrag = this.dragBound.contains(Input.mouseX, Input.mouseY);
         const onResize = this.resizeBound.contains(Input.mouseX, Input.mouseY);
+
+        g.ctx.font = '13px Arial';
+        g.ctx.textAlign = 'left';
+        g.ctx.textBaseline = 'middle';
+        
+     
+        const w = g.measureText(this.title);
+        const h = 16;
     
         // Top bar
-        g.setColor(onDrag ? Theme.windowBarHover : Theme.windowBar);
+        g.setColor(onDrag ? Theme.colors[WINDOW_BAR_HOVER] : Theme.colors[WINDOW_BAR]);
         g.fillRect(this.x, this.y, this.width, this.barHeight);
     
         // Título
-        g.setColor(Theme.windowTitle);
-        g.drawText(this.title, this.x + 10, this.y + 15);
+        g.setColor(Theme.colors[WINDOW_TITLE]);
+        g.drawText(this.title, this.x + 2, this.y+(this.barHeight*0.5) );
     
         // Botões
-        g.setColor(Theme.windowButtonClose);
+        g.setColor(Theme.colors[WINDOW_BUTTON_CLOSE]);
         g.fillRect(this.x + this.width - 25, this.y + 10, 15, 15); // [×]
-        g.setColor(Theme.windowButtonMinimize);
+        g.setColor(Theme.colors[WINDOW_BUTTON_MINIMIZE]);
         g.fillRect(this.x + this.width - 45, this.y + 10, 15, 15); // [–]
     
         // Símbolos
-        g.setColor(onClose ? Theme.windowButtonSymbolHover : Theme.windowButtonSymbol);
+        g.setColor(onClose ? Theme.colors[WINDOW_BUTTON_SYMBOL_HOVER] : Theme.colors[WINDOW_BUTTON_SYMBOL]);
         g.drawText("×", this.x + this.width - 22, this.y + 20);
     
-        g.setColor(onMinimize ? Theme.windowButtonSymbolHover : Theme.windowButtonSymbol);
+        g.setColor(onMinimize ? Theme.colors[WINDOW_BUTTON_SYMBOL_HOVER] : Theme.colors[WINDOW_BUTTON_SYMBOL]);
         g.drawText("–", this.x + this.width - 42, this.y + 20);
     
         // Conteúdo
@@ -223,14 +232,18 @@
             g.ctx.translate(this.x, this.y + this.barHeight);
             g.ctx.scale(1, this.scale);
     
-            g.setColor(Theme.windowBackground);
-            g.fillRect(0, 0, this.width, this.height - this.barHeight);
-    
-            if (onResize) {
-                g.setColor(Theme.windowResizeLines);
+            g.setColor(Theme.colors[WINDOW_BACKGROUND]);
+            //  g.fillRect(0, 0, this.width, this.height - this.barHeight);
+            g.drawRoundedRect(0, 0, this.width, this.height - this.barHeight,4);
+           
+            if (onResize)
+            {
+                g.setColor(Theme.colors[WINDOW_RESIZE_LINES]);
                 g.drawLine(this.width - 20, this.height - this.barHeight, this.width - 1, this.height - this.barHeight - 20);
                 g.drawLine(this.width - 10, this.height - this.barHeight, this.width - 1, this.height - this.barHeight - 10);
             }
+         
+
     
             this.layout.width = this.width;
             this.layout.height = this.height - this.barHeight;
@@ -238,18 +251,14 @@
             g.restore();
         }
 
-                // g.setColor("#888");
-        // g.drawLine(this.x + this.width - 10, this.y + this.height - 1, this.x + this.width - 1, this.y + this.height - 10);
-        // // Indicador de redimensionamento
-        // if (!this.minimized)
-        // {
-        // }
-        // g.setColor("rgb(255,0,0)");
-        // g.drawRect(this.closeBound.x, this.closeBound.y, this.closeBound.width, this.closeBound.height);
-        // g.drawRect(this.minimizeBound.x, this.minimizeBound.y, this.minimizeBound.width, this.minimizeBound.height);
-        // g.drawRect(this.dragBound.x, this.dragBound.y, this.dragBound.width, this.dragBound.height);
-        // g.drawRect(this.resizeBound.x, this.resizeBound.y, this.resizeBound.width, this.resizeBound.height);
 
+           // g.setColor("rgb(255,0,0)");
+            // g.drawRect(this.closeBound.x, this.closeBound.y, this.closeBound.width, this.closeBound.height);
+            // g.drawRect(this.minimizeBound.x, this.minimizeBound.y, this.minimizeBound.width, this.minimizeBound.height);
+            // g.drawRect(this.dragBound.x, this.dragBound.y, this.dragBound.width, this.dragBound.height);
+        //g.drawRect(this.resizeBound.x, this.resizeBound.y, this.resizeBound.width, this.resizeBound.height);
+  //      g.drawRect(this.bound.x, this.bound.y, this.bound.width, this.bound.height);
+//
     }
     
 }

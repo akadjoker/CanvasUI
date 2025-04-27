@@ -1,5 +1,5 @@
 
-export class TextView extends Widget
+class TextView extends Widget
 {
     constructor(content)
     {
@@ -31,7 +31,7 @@ export class TextView extends Widget
       ctx.restore();
       
       // Barra de rolagem
-      this._drawScrollBar(ctx);
+      this._drawScrollBar(g);
     }
     
     _renderContent(ctx)
@@ -43,6 +43,7 @@ export class TextView extends Widget
       
       const maxWidth = this.width - this.scrollBarWidth - 10;
       const words = this.content.split(' ');
+      this.bound.set(this.x, this.y, this.width, this.height);
       
       let line = '';
       let y = this.y + 10 - this.scrollPosition;
@@ -69,7 +70,7 @@ export class TextView extends Widget
       this.maxScroll = Math.max(0, contentHeight - this.height + 20);
     }
     
-    _drawScrollBar(ctx)
+    _drawScrollBar(g)
     {
         if (this.maxScroll > 0)
         {
@@ -78,12 +79,11 @@ export class TextView extends Widget
         const scrollPosition = (this.scrollPosition / this.maxScroll) * (this.height - scrollHeight);
         
         // Trilho da barra de rolagem
-        ctx.fillStyle = '#bdc3c7';
-        ctx.fillRect(this.x + this.width - this.scrollBarWidth, this.y, this.scrollBarWidth, this.height);
+        g.setColor(Theme.colors[SCROLL_BAR]);
+        g.fillRect(this.x + this.width - this.scrollBarWidth, this.y, this.scrollBarWidth, this.height);
         
-        // Barra de rolagem
-        ctx.fillStyle = this.isDraggingScroll ? '#7f8c8d' : '#95a5a6';
-        ctx.fillRect(
+        g.setColor(this.isDraggingScroll ? Theme.colors[SCROLL_BAR_THUMB] : Theme.colors[SCROLL_BAR_THUMB_MOVE]);
+        g.fillRect(
           this.x + this.width - this.scrollBarWidth + 2, 
           this.y + scrollPosition, 
           this.scrollBarWidth - 4, 
@@ -101,69 +101,48 @@ export class TextView extends Widget
     }
 
 
-
-    handleMouse(type, x, y, button)
-    {
-        if (!this.enabled || !this.visible) return false;
-        
-        if (type === 0 && this.contains(x, y))
-        { // DOWN
-            if (this.handleMouseDown(x, y)) {
-                return true;
-            }
-        }
-
-        if (type === 1) { // UP
-            this.isDraggingScroll = false;
-        }
-
-       
-
-        if (type === 2 )
-        { // MOVE
-
-            if (this.handleMouseMove(x, y)) {
-                return true;
-            }
-            
-        }
-
-        
-        return false;
-    }
+ 
     
     handleMouseMove(x, y)
     {
-        if (this.isDraggingScroll)
+        if (!this.active || !this.visible) return false;
+        this.isHovered = this.contains(x, y);
+        
+      
+
+        if (this.isDraggingScroll && this._isPointInScrollBar(x, y))
         {
         const scrollableHeight = this.height - (this.height * (this.height / (this.maxScroll + this.height)));
         const scrollRatio = (y - this.y) / this.height;
         this.scrollPosition = Math.max(0, Math.min(this.maxScroll, this.maxScroll * scrollRatio));
         return true;
       }
-      return this.contains(x, y);
+      return this.isHovered;
     }
     
     handleMouseDown(x, y)
     {
         if (this._isPointInScrollBar(x, y))
         {
-        this.isDraggingScroll = true;
-        return true;
-      }
-      return this.contains(x, y);
+          this.isDraggingScroll = true;
+          return true;
+       }
+      return false;
+    }
+  
+    handleMouseUp(x, y)
+    {
+      this.isDraggingScroll = false;
+      return false;
     }
     
  
     
-    handleWheel(deltaY)
+    handleMouseWheel(deltaY)
     {
-        if (this.contains(this.lastMouseX, this.lastMouseY))
-        {
-        this.scrollPosition += deltaY * 0.5;
+      if (!this.active || !this.visible || !this.isHovered) return false;
+        this.scrollPosition += deltaY * 10;
         this.scrollPosition = Math.max(0, Math.min(this.maxScroll, this.scrollPosition));
         return true;
-      }
-      return false;
     }
   }

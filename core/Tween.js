@@ -74,6 +74,12 @@ class Tween
       this.playing = false;
       this.finished = false;
     }
+
+    stop() {
+      this.active = false;
+      this.playing = false;
+      this.finished = false;
+    }
   
   play() {
       this.elapsed = 0;
