@@ -1,21 +1,4 @@
-const AlignVertical = { Top: 0, Center: 1, Bottom: 2 };
-const AlignHorizontal = { Left: 0, Center: 1, Right: 2 };
-
-
-class Padding
-{
-    constructor(top = 0, bottom = 0, left = 0, right = 0)
-    {
-        this.top = top; this.bottom = bottom;
-        this.left = left; this.right = right;
-    }
-    reset(v)
-    {
-        this.top = this.bottom = this.left = this.right = v;
-    }
-}
-
-class Rectangle {
+export class Rectangle {
     constructor(x = 0, y = 0, width = 0, height = 0) {
         this.x = x;
         this.y = y;
@@ -41,14 +24,6 @@ class Rectangle {
         );
     }
 
-    addPoint(x, y)
-    {
-        this.x = Math.min(this.x, x);
-        this.y = Math.min(this.y, y);
-        this.width = Math.max(this.width, x - this.x);
-        this.height = Math.max(this.height, y - this.y);
-    }
-
     set(x, y, width, height) {
         this.x = x;
         this.y = y;
@@ -65,7 +40,7 @@ class Rectangle {
     }
 }
 
- class Vector2 {
+export class Vector2 {
     constructor(x = 0, y = 0) {
         this.x = x;
         this.y = y;

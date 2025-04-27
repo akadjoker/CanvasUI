@@ -1,7 +1,6 @@
 
 
-class Tween
-{
+export class Tween {
     constructor(target, property, from, to, duration, easing = Tween.EASE_LINEAR, mode = Tween.MODE_ONCE, now=true, autoremove = true) {
       this.target = target;
       this.property = property;

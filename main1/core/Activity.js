@@ -1,18 +1,20 @@
+import { Input } from "./Input.js";
+import { Navigator } from "./Fragment.js";
 
-
- class Activity
+export class Activity
 {
-    constructor(canvas, virtualWidth = 800, virtualHeight = 900, fitMode = "none") 
+    constructor(canvas, virtualWidth = 800, virtualHeight = 900, fitMode = "fit") 
     {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
-        this.g  = new Graphics(this.ctx);
+        this.g = null;
         this.fragment = null;
         this.virtualWidth = virtualWidth;
         this.virtualHeight = virtualHeight;
         this.width = virtualWidth;
         this.height = virtualHeight;
         this.fitMode = fitMode; // "fit", "stretch", "fill"
+        Navigator.Instance();
         this.scaleX = 1;
         this.scaleY = 1;
         this.offsetX = 0;
@@ -20,20 +22,19 @@
         this.pointX = 0;
         this.pointY = 0;
 
-
+        this.resizeCanvas();
         window.addEventListener("resize", () => this.resizeCanvas());
 
 
         window.addEventListener("keydown", e => Input.onKeyDown(e.code));
         window.addEventListener("keyup", e => Input.onKeyUp(e.code));
-        window.addEventListener('wheel', e => this._onMouseWhell(e));
 
         canvas.addEventListener("mousedown", e => this._onMouseDown(e));
         canvas.addEventListener("mouseup", e => this._onMouseUp(e));
         canvas.addEventListener("mousemove", e => this._onMouseMove(e));
         this._setupTouchAsMouse(canvas);
 
-        Theme.setDefault();
+ 
 
         Input.init();
 
@@ -43,45 +44,10 @@
         this.fps = 0;
         this._frames = 0;
         this._fpsTime = 0;
-        this.fragments = {};
-        this.currentFragment = null;
     }
-     
-     addFragment(name, fragment)
-     {
-         this.fragments[name] = fragment;
-         return fragment;
-     }
 
-     setFragment(name)
-     {
-         if (this.currentFragment)
-         {
-             this.currentFragment.onClose();
-         }
-         this.currentFragment = this.fragments[name];
-         if (this.currentFragment)
-         {
-             this.currentFragment.activity = this;
-             this.currentFragment.width = this.width;
-             this.currentFragment.height = this.height;
-             this.currentFragment.onCreate();
-         } else 
-         {
-            console.log("Fragment not found:", name);
-         }
-     }
-     
-     create(){}
-     update(dt) { }
-     render(g) { } 
-     resize(w, h) { }
-     
-
-     _setupTouchAsMouse(canvas)
-     {
-         const getTouchPos = (e) =>
-         {
+    _setupTouchAsMouse(canvas) {
+        const getTouchPos = (e) => {
             const rect = canvas.getBoundingClientRect();
             const touch = e.touches[0] || e.changedTouches[0];
             return {
@@ -134,51 +100,36 @@
         });
     }
     
-     _onMouseWhell(e)
-     {
-        
-         Input.onMouseWheel(e.deltaY);
-         this._handleMouse(Input.WHEEL, 0, e.deltaY, -1);
-    }
 
-     _onMouseDown(e)
-     {
+    _onMouseDown(e) {
         Input.onMouseDown(e.button);
         const { x, y } = this._getMouseCoords(e);
+        Input.onMouseMove(x, y); // atualiza também a posição
         this.pointX = x;
         this.pointY = y;
-        Input.onMouseMove(x, y);  
-        this._handleMouse(Input.DOWN, x, y, e.button);
-
+        this._handleMouse(Input.Mouse.DOWN, x, y, e.button);
+        console.log("down");
     }
 
-     _onMouseUp(e)
-     {
+    _onMouseUp(e) {
         Input.onMouseUp(e.button);
-         const { x, y } = this._getMouseCoords(e);
-         this.pointX = x;
-         this.pointY = y;
+        const { x, y } = this._getMouseCoords(e);
         Input.onMouseMove(x, y);
-        this._handleMouse(Input.UP, x, y, e.button);
+        this._handleMouse(Input.Mouse.UP, x, y, e.button);
     }
 
     _onMouseMove(e) {
         const { x, y } = this._getMouseCoords(e);
-
         Input.onMouseMove(x, y);
-        this._handleMouse(Input.MOVE, x, y, -1);
+        this._handleMouse(Input.Mouse.MOVE, x, y, -1);
     }
 
     _handleMouse(type, x, y, button)
     {
-            if (this.currentFragment)
-            {
-                this.currentFragment.onHandleMouse(type, x, y, button);
-            }
+        Navigator.Instance().handleMouse(type, x, y, button);
     }
 
-     resizeCanvas()
-     {
+    resizeCanvas() {
         const w = window.innerWidth;
         const h = window.innerHeight;
         this.width = w;
@@ -227,18 +178,21 @@
             this.virtualHeight = h;
         }
 
-         this.resize(this.virtualWidth, this.virtualHeight);
-         if (this.currentFragment)
-            {
-                this.currentFragment.resize(this.virtualWidth, this.virtualHeight);
-            }
+        Navigator.Instance().resize(w,h,this.virtualWidth, this.virtualHeight);
 
         
     }
+    // resizeCanvas()
+    // {
+    //     this.canvas.width = window.innerWidth;
+    //     this.canvas.height = window.innerHeight;
+    //     if (this.fragment)
+    //     {
+    //         this.fragment.onResize(this.canvas.width, this.canvas.height);
+    //     }
+    // }
 
-
-     _getMouseCoords(e)
-     {
+    _getMouseCoords(e) {
         const rect = this.canvas.getBoundingClientRect();
         const realX = e.clientX - rect.left;
         const realY = e.clientY - rect.top;
@@ -251,14 +205,27 @@
 
  
 
+    setGraphics(g) {
+        this.g = g;
+    }
 
-  
+    setFragment(fragment)
+    {
+        Navigator.Instance().setFragment(fragment);
+    }
 
- 
-     start()
-     {
-         this.resizeCanvas();
-         this.create();
+    addFragment(name, fragment)
+    {
+        fragment.activity = this;
+        Navigator.Instance().addFragment(name, fragment);    
+    }
+
+    switchFragment(name, outTransition = null, inTransition = null)
+    {
+        Navigator.Instance().switchFragment(name, outTransition, inTransition);
+    }
+
+    start() {
         const loop = (now) =>
         {
             const dt = (now - this.lastTime) / 1000;
@@ -277,33 +244,20 @@
                 this.firstRender = false;
                 this.resizeCanvas();
             }
-            this.g.clear(Theme.colors[BACKGROUND]);
+            this.g.clear(Theme.colors[]);
             this.ctx.save();
    
             this.ctx.translate(this.offsetX, this.offsetY);
             this.ctx.scale(this.scaleX, this.scaleY);
 
-
-
-
-            this.update(dt);
-            this.render(this.g);
-
-            if (this.currentFragment)
-            {
-                this.currentFragment.onUpdate(dt);
-                this.currentFragment.onDebug(this.g);
-                this.currentFragment.onRender(this.g);
-            }
-
             
-            this.g.setColor("#00ff88");
-            this.g.drawRect(0,0, this.virtualWidth, this.virtualHeight-1);
+    
+            Navigator.Instance().update(this.g, dt);
             this.g.fillCircle(this.pointX, this.pointY, 4);
             this.ctx.restore();
-            
-            this.g.setColor("rgb(245,45,45");
-            this.g.drawText(`FPS: ${this.fps} (${this.width}/${this.height}) - ${this.virtualWidth}/${this.virtualHeight}  `, 10, this.height - 16, 14);
+
+            this.g.setColor("#rgb(45,45,45");
+            this.g.drawText(`FPS: ${this.fps} (${this.width}/${this.height}) `, 10, this.height - 16, 14);
 
             
             Input.update();

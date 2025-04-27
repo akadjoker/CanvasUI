@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sistema de Layout em Canvas</title>
+</head>
+<body>
+   
+    <script>
+   class Widget {
+    constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.isHovered = false;
+        this.isPressed = false;
+        this.isVisible = true;
+        this.parent = null;
+    }
+
+    containsPoint(x, y) {
+        return (
+            this.isVisible &&
+            x >= this.x &&
+            x <= this.x + this.width &&
+            y >= this.y &&
+            y <= this.y + this.height
+        );
+    }
+
+    onMouseMove(x, y) {
+        const wasHovered = this.isHovered;
+        this.isHovered = this.containsPoint(x, y);
+        
+        if (wasHovered !== this.isHovered) {
+            return true; // State changed, needs redraw
+        }
+        return false;
+    }
+
+    onMouseDown(x, y) {
+        if (this.containsPoint(x, y)) {
+            this.isPressed = true;
+            return true; // Handled
+        }
+        return false;
+    }
+
+    onMouseUp(x, y) {
+        if (this.isPressed) {
+            this.isPressed = false;
+            if (this.containsPoint(x, y)) {
+                this.onClick();
+                return true; // Handled
+            }
+        }
+        return false;
+    }
+
+    onClick() {
+        // Override in subclasses
+    }
+
+    draw(ctx) {
+        // Base drawing implementation to be overridden by subclasses
+    }
+
+    setParent(parent) {
+        this.parent = parent;
+    }
+
+    setVisible(visible) {
+        this.isVisible = visible;
+    }
+}
+
+class CheckBox extends Widget {
+    constructor(x, y, size, label = "", checked = false) {
+        super(x, y, size + (label ? size * 5 : 0), size);
+        this.size = size;
+        this.label = label;
+        this.checked = checked;
+        this.onChange = null; // Callback para quando o estado mudar
+    }
+
+    onClick() {
+        this.checked = !this.checked;
+        if (this.onChange) {
+            this.onChange(this.checked);
+        }
+    }
+
+    setChecked(checked) {
+        if (this.checked !== checked) {
+            this.checked = checked;
+            if (this.onChange) {
+                this.onChange(this.checked);
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.isVisible) return;
+
+        // Desenha a caixa
+        ctx.strokeStyle = this.isHovered ? "#007bff" : "#000000";
+        ctx.lineWidth = this.isPressed ? 2 : 1;
+        ctx.fillStyle = "#ffffff";
+        
+        ctx.beginPath();
+        ctx.rect(this.x, this.y, this.size, this.size);
+        ctx.fill();
+        ctx.stroke();
+
+        // Desenha o check mark se estiver marcado
+        if (this.checked) {
+            ctx.beginPath();
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = 2;
+            ctx.moveTo(this.x + this.size * 0.2, this.y + this.size * 0.5);
+            ctx.lineTo(this.x + this.size * 0.4, this.y + this.size * 0.7);
+            ctx.lineTo(this.x + this.size * 0.8, this.y + this.size * 0.3);
+            ctx.stroke();
+        }
+
+        // Desenha o texto do label
+        if (this.label) {
+            ctx.fillStyle = "#000000";
+            ctx.font = `${this.size * 0.8}px Arial`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText(this.label, this.x + this.size + 5, this.y + this.size / 2);
+        }
+    }
+}
+
+class CheckBoxGroup extends Widget {
+    constructor(x, y, vertical = true) {
+        super(x, y, 0, 0);
+        this.checkboxes = [];
+        this.vertical = vertical;
+        this.spacing = 10; // Espaçamento entre os checkboxes
+        this.onChange = null; // Callback quando qualquer checkbox mudar
+    }
+
+    addCheckBox(checkbox) {
+        checkbox.setParent(this);
+        
+        // Configura o callback para quando o checkbox mudar
+        const self = this;
+        checkbox.onChange = function(checked) {
+            if (self.onChange) {
+                self.onChange(self.getCheckedValues());
+            }
+        };
+        
+        // Posiciona o checkbox de acordo com o layout
+        if (this.checkboxes.length > 0) {
+            const lastCheckbox = this.checkboxes[this.checkboxes.length - 1];
+            if (this.vertical) {
+                checkbox.x = this.x;
+                checkbox.y = lastCheckbox.y + lastCheckbox.height + this.spacing;
+            } else {
+                checkbox.x = lastCheckbox.x + lastCheckbox.width + this.spacing;
+                checkbox.y = this.y;
+            }
+        } else {
+            checkbox.x = this.x;
+            checkbox.y = this.y;
+        }
+        
+        this.checkboxes.push(checkbox);
+        
+        // Recalcula o tamanho do grupo
+        this.recalculateSize();
+    }
+
+    recalculateSize() {
+        if (this.checkboxes.length === 0) {
+            this.width = 0;
+            this.height = 0;
+            return;
+        }
+
+        let maxX = 0;
+        let maxY = 0;
+
+        for (const checkbox of this.checkboxes) {
+            maxX = Math.max(maxX, checkbox.x + checkbox.width);
+            maxY = Math.max(maxY, checkbox.y + checkbox.height);
+        }
+
+        this.width = maxX - this.x;
+        this.height = maxY - this.y;
+    }
+
+    getCheckedValues() {
+        return this.checkboxes
+            .filter(checkbox => checkbox.checked)
+            .map((checkbox, index) => {
+                return {
+                    index: index,
+                    label: checkbox.label
+                };
+            });
+    }
+
+    onMouseMove(x, y) {
+        let needsRedraw = false;
+        
+        for (const checkbox of this.checkboxes) {
+            if (checkbox.onMouseMove(x, y)) {
+                needsRedraw = true;
+            }
+        }
+        
+        return needsRedraw;
+    }
+
+    onMouseDown(x, y) {
+        for (const checkbox of this.checkboxes) {
+            if (checkbox.onMouseDown(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    onMouseUp(x, y) {
+        for (const checkbox of this.checkboxes) {
+            if (checkbox.onMouseUp(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    draw(ctx) {
+        if (!this.isVisible) return;
+        
+        for (const checkbox of this.checkboxes) {
+            checkbox.draw(ctx);
+        }
+    }
+}
+
+class RadioItem extends Widget {
+    constructor(x, y, size, label = "", checked = false) {
+        super(x, y, size + (label ? size * 5 : 0), size);
+        this.size = size;
+        this.label = label;
+        this.checked = checked;
+        this.onChange = null; // Callback para quando o estado mudar
+    }
+
+    onClick() {
+        if (!this.checked) {
+            this.setChecked(true);
+        }
+    }
+
+    setChecked(checked) {
+        if (this.checked !== checked) {
+            this.checked = checked;
+            if (this.onChange) {
+                this.onChange(this.checked);
+            }
+            
+            // Se este radio foi marcado, e está em um grupo, desmarca os outros
+            if (checked && this.parent && this.parent instanceof RadioGroup) {
+                this.parent.updateSelection(this);
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.isVisible) return;
+
+        // Desenha o círculo do radio button
+        ctx.strokeStyle = this.isHovered ? "#007bff" : "#000000";
+        ctx.lineWidth = this.isPressed ? 2 : 1;
+        ctx.fillStyle = "#ffffff";
+        
+        const radius = this.size / 2;
+        const centerX = this.x + radius;
+        const centerY = this.y + radius;
+        
+        // Círculo externo
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Círculo interno se estiver marcado
+        if (this.checked) {
+            ctx.beginPath();
+            ctx.fillStyle = "#000000";
+            ctx.arc(centerX, centerY, radius * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Desenha o texto do label
+        if (this.label) {
+            ctx.fillStyle = "#000000";
+            ctx.font = `${this.size * 0.8}px Arial`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText(this.label, this.x + this.size + 5, this.y + this.size / 2);
+        }
+    }
+}
+
+// RadioGroup - gerencia um grupo de radio buttons onde apenas um pode estar selecionado
+class RadioGroup extends Widget {
+    constructor(x, y, vertical = true) {
+        super(x, y, 0, 0);
+        this.radioItems = [];
+        this.vertical = vertical;
+        this.spacing = 10; // Espaçamento entre os radio buttons
+        this.selectedIndex = -1; // Índice do item selecionado
+        this.onChange = null; // Callback quando a seleção mudar
+    }
+
+    addRadioItem(radioItem) {
+        radioItem.setParent(this);
+        
+        // Configura o callback para quando o radio mudar
+        const self = this;
+        const index = this.radioItems.length;
+        
+        radioItem.onChange = function(checked) {
+            if (checked) {
+                self.selectedIndex = index;
+                if (self.onChange) {
+                    self.onChange(self.selectedIndex);
+                }
+            }
+        };
+        
+        // Posiciona o radio de acordo com o layout
+        if (this.radioItems.length > 0) {
+            const lastRadio = this.radioItems[this.radioItems.length - 1];
+            if (this.vertical) {
+                radioItem.x = this.x;
+                radioItem.y = lastRadio.y + lastRadio.height + this.spacing;
+            } else {
+                radioItem.x = lastRadio.x + lastRadio.width + this.spacing;
+                radioItem.y = this.y;
+            }
+        } else {
+            radioItem.x = this.x;
+            radioItem.y = this.y;
+        }
+        
+        // Se este for o primeiro radio e não houver seleção, marque-o como selecionado
+        if (this.radioItems.length === 0 && this.selectedIndex === -1 && radioItem.checked) {
+            this.selectedIndex = 0;
+        }
+        
+        this.radioItems.push(radioItem);
+        
+        // Recalcula o tamanho do grupo
+        this.recalculateSize();
+    }
+
+    updateSelection(selectedRadio) {
+        // Desmarca todos os outros radio buttons no grupo
+        for (let i = 0; i < this.radioItems.length; i++) {
+            const radio = this.radioItems[i];
+            if (radio !== selectedRadio && radio.checked) {
+                // Desativa o callback temporariamente para evitar loops de notificação
+                const originalCallback = radio.onChange;
+                radio.onChange = null;
+                radio.setChecked(false);
+                radio.onChange = originalCallback;
+            }
+            
+            if (radio === selectedRadio) {
+                this.selectedIndex = i;
+            }
+        }
+        
+        // Notifica sobre a mudança
+        if (this.onChange) {
+            this.onChange(this.selectedIndex);
+        }
+    }
+
+    setSelectedIndex(index) {
+        if (index >= 0 && index < this.radioItems.length && index !== this.selectedIndex) {
+            this.radioItems[index].setChecked(true);
+        }
+    }
+
+    getSelectedIndex() {
+        return this.selectedIndex;
+    }
+
+    getSelectedValue() {
+        if (this.selectedIndex >= 0) {
+            return {
+                index: this.selectedIndex,
+                label: this.radioItems[this.selectedIndex].label
+            };
+        }
+        return null;
+    }
+
+    recalculateSize() {
+        if (this.radioItems.length === 0) {
+            this.width = 0;
+            this.height = 0;
+            return;
+        }
+
+        let maxX = 0;
+        let maxY = 0;
+
+        for (const radio of this.radioItems) {
+            maxX = Math.max(maxX, radio.x + radio.width);
+            maxY = Math.max(maxY, radio.y + radio.height);
+        }
+
+        this.width = maxX - this.x;
+        this.height = maxY - this.y;
+    }
+
+    onMouseMove(x, y) {
+        let needsRedraw = false;
+        
+        for (const radio of this.radioItems) {
+            if (radio.onMouseMove(x, y)) {
+                needsRedraw = true;
+            }
+        }
+        
+        return needsRedraw;
+    }
+
+    onMouseDown(x, y) {
+        for (const radio of this.radioItems) {
+            if (radio.onMouseDown(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    onMouseUp(x, y) {
+        for (const radio of this.radioItems) {
+            if (radio.onMouseUp(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    draw(ctx) {
+        if (!this.isVisible) return;
+        
+        for (const radio of this.radioItems) {
+            radio.draw(ctx);
+        }
+    }
+}
+
+// Widget Manager - gerencia todos os widgets e eventos
+class WidgetManager {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext("2d");
+        this.widgets = [];
+        this.draggingWidget = null;
+
+        // Configuração dos event listeners
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        const self = this;
+
+        this.canvas.addEventListener("mousemove", function(e) {
+            const rect = self.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            let needsRedraw = false;
+            for (const widget of self.widgets) {
+                if (widget.onMouseMove(x, y)) {
+                    needsRedraw = true;
+                }
+            }
+            
+            if (needsRedraw) {
+                self.draw();
+            }
+        });
+
+        this.canvas.addEventListener("mousedown", function(e) {
+            const rect = self.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            for (const widget of self.widgets) {
+                if (widget.onMouseDown(x, y)) {
+                    self.draggingWidget = widget;
+                    self.draw();
+                    break;
+                }
+            }
+        });
+
+        this.canvas.addEventListener("mouseup", function(e) {
+            const rect = self.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (self.draggingWidget) {
+                self.draggingWidget.onMouseUp(x, y);
+                self.draggingWidget = null;
+                self.draw();
+            } else {
+                for (const widget of self.widgets) {
+                    if (widget.onMouseUp(x, y)) {
+                        self.draw();
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    addWidget(widget) {
+        this.widgets.push(widget);
+    }
+
+    draw() {
+        // Limpa o canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Desenha todos os widgets
+        for (const widget of this.widgets) {
+            widget.draw(this.ctx);
+        }
+    }
+}
+
+// Função de exemplo para inicializar e demonstrar o sistema
+function initDemo() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 400;
+    canvas.height = 300;
+    document.body.appendChild(canvas);
+    
+    const manager = new WidgetManager(canvas);
+    
+    // Criar checkboxes individuais
+    const checkbox1 = new CheckBox(20, 20, 20, "Opção 1");
+    const checkbox2 = new CheckBox(20, 50, 20, "Opção 2", true);
+    
+    // Criar um grupo de checkboxes
+    const checkboxGroup = new CheckBoxGroup(20, 100, true);
+    checkboxGroup.addCheckBox(new CheckBox(0, 0, 15, "Grupo Item 1"));
+    checkboxGroup.addCheckBox(new CheckBox(0, 0, 15, "Grupo Item 2"));
+    checkboxGroup.addCheckBox(new CheckBox(0, 0, 15, "Grupo Item 3"));
+    
+    // Criar outro grupo de checkboxes horizontais
+    const horizontalGroup = new CheckBoxGroup(20, 200, false);
+    horizontalGroup.addCheckBox(new CheckBox(0, 0, 15, "H1"));
+    horizontalGroup.addCheckBox(new CheckBox(0, 0, 15, "H2"));
+    horizontalGroup.addCheckBox(new CheckBox(0, 0, 15, "H3"));
+    
+    // Adicionar widgets ao gerenciador
+    manager.addWidget(checkbox1);
+    manager.addWidget(checkbox2);
+    manager.addWidget(checkboxGroup);
+    manager.addWidget(horizontalGroup);
+    
+    // Desenhar tudo
+    manager.draw();
+    
+    // Exemplo de callback para mudanças no grupo
+    checkboxGroup.onChange = function(checkedItems) {
+        console.log("Grupo mudou:", checkedItems);
+    };
+    
+    return manager;
+}
+
+function initRadioDemo() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 400;
+    canvas.height = 300;
+    document.body.appendChild(canvas);
+    
+    const manager = new WidgetManager(canvas);
+    
+    // Criar radio buttons individuais
+    const radio1 = new RadioItem(20, 20, 20, "Radio Individual 1");
+    const radio2 = new RadioItem(20, 50, 20, "Radio Individual 2", true);
+    
+    // Criar um grupo de radio buttons vertical
+    const radioGroup = new RadioGroup(20, 100, true);
+    radioGroup.addRadioItem(new RadioItem(0, 0, 15, "Opção 1"));
+    radioGroup.addRadioItem(new RadioItem(0, 0, 15, "Opção 2", true)); // Este será marcado por padrão
+    radioGroup.addRadioItem(new RadioItem(0, 0, 15, "Opção 3"));
+    
+    // Criar outro grupo de radio buttons horizontal
+    const horizontalRadioGroup = new RadioGroup(20, 200, false);
+    horizontalRadioGroup.addRadioItem(new RadioItem(0, 0, 15, "A"));
+    horizontalRadioGroup.addRadioItem(new RadioItem(0, 0, 15, "B"));
+    horizontalRadioGroup.addRadioItem(new RadioItem(0, 0, 15, "C"));
+    
+    // Adicionar widgets ao gerenciador
+    manager.addWidget(radio1);
+    manager.addWidget(radio2);
+    manager.addWidget(radioGroup);
+    manager.addWidget(horizontalRadioGroup);
+    
+    // Callback para mudança na seleção
+    radioGroup.onChange = function(selectedIndex) {
+        console.log("Seleção mudou para:", radioGroup.getSelectedValue());
+    };
+    
+    // Desenhar tudo
+    manager.draw();
+    
+    return manager;
+}
+
+// Sistema completo de demonstração
+function initCompleteDemo() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 500;
+    canvas.height = 400;
+    document.body.appendChild(canvas);
+    
+    const manager = new WidgetManager(canvas);
+    
+    // Criar checkboxes
+    const checkboxGroup = new CheckBoxGroup(20, 20, true);
+    checkboxGroup.addCheckBox(new CheckBox(0, 0, 20, "Opção Multi 1"));
+    checkboxGroup.addCheckBox(new CheckBox(0, 0, 20, "Opção Multi 2", true));
+    checkboxGroup.addCheckBox(new CheckBox(0, 0, 20, "Opção Multi 3"));
+    
+    // Criar radio buttons
+    const radioGroup = new RadioGroup(230, 20, true);
+    radioGroup.addRadioItem(new RadioItem(0, 0, 20, "Opção Única 1"));
+    radioGroup.addRadioItem(new RadioItem(0, 0, 20, "Opção Única 2", true));
+    radioGroup.addRadioItem(new RadioItem(0, 0, 20, "Opção Única 3"));
+    
+    // Adicionar widgets ao gerenciador
+    manager.addWidget(checkboxGroup);
+    manager.addWidget(radioGroup);
+    
+    // Callbacks para mudanças
+    checkboxGroup.onChange = function(checkedItems) {
+        console.log("Checkbox seleções:", checkedItems);
+    };
+    
+    radioGroup.onChange = function(selectedIndex) {
+        console.log("Radio seleção:", radioGroup.getSelectedValue());
+    };
+    
+    // Desenhar tudo
+    manager.draw();
+    
+    return manager;
+}
+
+window.onload = function() {
+    const manager = initCompleteDemo();
+    console.log(manager);
+};
+    </script>
+</body>
+</html>
